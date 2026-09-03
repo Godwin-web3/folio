@@ -13,7 +13,7 @@ export const approveSend = action({
     const key = process.env.AGENTMAIL_API_KEY;
     if (key && file.file.mailInboxId && msg.toEmail) {
       const res = await fetch(
-        `https://api.agentmail.to/v0/inboxes/${file.file.mailInboxId}/messages`,
+        `https://api.agentmail.to/v0/inboxes/${file.file.mailInboxId}/messages/send`,
         {
           method: "POST",
           headers: {
@@ -122,6 +122,25 @@ export const logInbound = mutation({
     await ctx.db.patch(args.fileId, {
       status: nextStatus(file.status, "answered"),
     });
+  },
+});
+
+export const stampFriday = action({
+  args: { userId: v.string(), fileId: v.id("addressFiles") },
+  handler: async (ctx, args): Promise<string> => {
+    const d = new Date();
+    const add = (5 - d.getUTCDay() + 7) % 7 || 7;
+    d.setUTCDate(d.getUTCDate() + add);
+    const friday = d.toISOString().slice(0, 10);
+    await ctx.runMutation(api.mail.logInbound, {
+      fileId: args.fileId,
+      from: "notices@northside-residential.example",
+      body: `We'll send someone Friday ${friday}. Sorry about the wait.`,
+      classification: "promise",
+      summary: `Landlord promised repairs on ${friday}.`,
+      promiseOn: friday,
+    });
+    return friday;
   },
 });
 

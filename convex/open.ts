@@ -5,16 +5,10 @@ import type { Id } from "./_generated/dataModel";
 import { caseInbox } from "./lib";
 
 async function provisionInbox(
-  username: string,
-  clientId: string,
+  displayName: string,
 ): Promise<{ id: string; address: string } | null> {
   const key = process.env.AGENTMAIL_API_KEY;
   if (!key) return null;
-  const slug = username
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 42);
   try {
     const res = await fetch("https://api.agentmail.to/v0/inboxes", {
       method: "POST",
@@ -22,7 +16,7 @@ async function provisionInbox(
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username: slug, client_id: clientId }),
+      body: JSON.stringify({ display_name: displayName.slice(0, 80) }),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as {
@@ -32,8 +26,8 @@ async function provisionInbox(
       address?: string;
     };
     const id = json.inbox_id || json.inboxId;
-    const address = json.email || json.address;
-    if (!id || !address) return null;
+    if (!id) return null;
+    const address = json.email || json.address || (id.includes("@") ? id : `${id}@agentmail.to`);
     return { id, address };
   } catch {
     return null;
@@ -58,8 +52,7 @@ export const openFile = action({
   handler: async (ctx, args): Promise<Id<"addressFiles">> => {
     const fallback = caseInbox(args.street, args.unit);
     const mail = await provisionInbox(
-      `${args.unit || "unit"}-${args.street}`,
-      `folio:${args.userId}:${args.street}`,
+      `Folio ${args.unit ? `${args.street} ${args.unit}` : args.street}`,
     );
     return ctx.runMutation(api.files.create, {
       userId: args.userId,

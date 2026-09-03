@@ -8,8 +8,10 @@
  * @module
  */
 
+import type * as ai from "../ai.js";
 import type * as building from "../building.js";
 import type * as buildingStore from "../buildingStore.js";
+import type * as demo from "../demo.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as letters from "../letters.js";
@@ -24,8 +26,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  ai: typeof ai;
   building: typeof building;
   buildingStore: typeof buildingStore;
+  demo: typeof demo;
   files: typeof files;
   http: typeof http;
   letters: typeof letters;
@@ -60,4 +64,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  staticHosting: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"staticHosting">;
+};

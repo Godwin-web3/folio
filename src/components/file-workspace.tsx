@@ -1,17 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import {
-  buildPacket,
-  draftLetters,
-  getFile,
-  ingestNotice,
-  logReply,
-  pullBuilding,
-  sendLetter,
-} from "@/lib/open-address/data";
+import { api, asFileId, asMessageId, mapBundle } from "@/lib/open-address/convex-client";
+import { ingestNotice, logReply } from "@/lib/open-address/data";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
@@ -50,21 +44,21 @@ function FileShell({
   userId: string;
 }) {
   const navigate = useNavigate();
-  const [bundle, setBundle] = useState<FileBundle | null>(null);
+  const raw = useQuery(api.files.get, {
+    userId,
+    fileId: asFileId(fileId),
+  });
+  const crawl = useAction(api.building.crawlBuilding);
+  const draft = useAction(api.letters.propose);
+  const send = useAction(api.mail.approveSend);
+  const pack = useMutation(api.letters.assemble);
+  const friday = useAction(api.mail.stampFriday);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noticeText, setNoticeText] = useState("");
   const [replyText, setReplyText] = useState("");
 
-  const load = useCallback(async () => {
-    setBundle(await getFile(userId, fileId));
-  }, [fileId, userId]);
-
-  useEffect(() => {
-    void load().catch((err: unknown) =>
-      setError(err instanceof Error ? err.message : "Could not load file"),
-    );
-  }, [load]);
+  const bundle = raw ? mapBundle(raw) : null;
 
   async function run(label: string, fn: () => Promise<void>) {
     if (busy) return;
@@ -109,13 +103,11 @@ function FileShell({
               void run("notice", async () => {
                 await ingestNotice(userId, fileId, noticeText);
                 setNoticeText("");
-                await load();
               })
             }
             onCrawl={() =>
               void run("crawl", async () => {
-                await pullBuilding(userId, fileId);
-                await load();
+                await crawl({ userId, fileId: asFileId(fileId) });
               })
             }
             onNext={() =>
@@ -135,25 +127,33 @@ function FileShell({
             setReplyText={setReplyText}
             onDraft={() =>
               void run("draft", async () => {
-                await draftLetters(userId, fileId);
-                await load();
+                await draft({ userId, fileId: asFileId(fileId) });
               })
             }
             onSend={(messageId) =>
               void run("send", async () => {
-                const sent = await sendLetter(userId, messageId);
-                if (!bundle.file.mail_inbox_id) {
-                  const href = mailtoHref(sent);
-                  if (href) window.location.href = href;
+                const via = await send({
+                  userId,
+                  messageId: asMessageId(messageId),
+                });
+                if (via !== "agentmail") {
+                  const msg = bundle.messages.find((m) => m.id === messageId);
+                  if (msg) {
+                    const href = mailtoHref(msg);
+                    if (href) window.location.href = href;
+                  }
                 }
-                await load();
               })
             }
             onInbound={() =>
               void run("inbound", async () => {
                 await logReply(userId, fileId, replyText);
                 setReplyText("");
-                await load();
+              })
+            }
+            onFriday={() =>
+              void run("friday", async () => {
+                await friday({ userId, fileId: asFileId(fileId) });
               })
             }
             onNext={() =>
@@ -171,8 +171,7 @@ function FileShell({
             busy={busy}
             onPacket={() =>
               void run("packet", async () => {
-                await buildPacket(userId, fileId);
-                await load();
+                await pack({ userId, fileId: asFileId(fileId) });
               })
             }
           />
@@ -296,6 +295,7 @@ function LettersScreen({
   onDraft,
   onSend,
   onInbound,
+  onFriday,
   onNext,
 }: {
   bundle: FileBundle;
@@ -305,6 +305,7 @@ function LettersScreen({
   onDraft: () => void;
   onSend: (id: string) => void;
   onInbound: () => void;
+  onFriday: () => void;
   onNext: () => void;
 }) {
   const demand = bundle.messages.find((m) => m.classification === "demand");
@@ -369,6 +370,14 @@ function LettersScreen({
               className="folio-btn-ghost w-full"
             >
               {busy === "inbound" ? "Filing…" : "Stamp this as a claim"}
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={onFriday}
+              className="folio-btn-stamp w-full"
+            >
+              {busy === "friday" ? "Stamping…" : "They said Friday — stamp it"}
             </button>
           </>
         )}

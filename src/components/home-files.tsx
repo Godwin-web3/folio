@@ -1,21 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useAction, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { getFile, listFiles, loadSample, openFile } from "@/lib/open-address/data";
+import { api, mapFile } from "@/lib/open-address/convex-client";
+import { openFile } from "@/lib/open-address/data";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
-  casePulse,
+  daysUntil,
+  formatDay,
   recommendedStepFromPulse,
   type CasePulse,
 } from "@/lib/open-address/flow";
 import type { AddressFile } from "@/lib/open-address/types";
 import { AppHeader, Field } from "@/components/app-shell";
 import { FolioMark } from "@/components/marks";
-
-type Card = { file: AddressFile; pulse: CasePulse };
 
 export function HomeFiles() {
   const { session, isPending } = useFolioSession();
@@ -28,7 +29,8 @@ export function HomeFiles() {
 
 function HomeShell({ userId, name }: { userId: string; name: string }) {
   const navigate = useNavigate();
-  const [cards, setCards] = useState<Card[]>([]);
+  const rawCards = useQuery(api.files.listCards, { userId });
+  const openDemo = useAction(api.demo.openCase);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openForm, setOpenForm] = useState(false);
@@ -39,22 +41,52 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
 
-  const refresh = useCallback(async () => {
-    const files = await listFiles(userId);
-    const next = await Promise.all(
-      files.map(async (file) => {
-        const bundle = await getFile(userId, file.id);
-        return { file, pulse: casePulse(bundle) };
-      }),
-    );
-    setCards(next);
-  }, [userId]);
-
-  useEffect(() => {
-    void refresh().catch((err: unknown) =>
-      setError(err instanceof Error ? err.message : "Could not load files"),
-    );
-  }, [refresh]);
+  const cards: { file: AddressFile; pulse: CasePulse }[] = (rawCards ?? []).map(
+    (row) => {
+      const file = mapFile(row.file);
+      const days = daysUntil(row.deadlineOn);
+      const pulse: CasePulse = {
+        dueOn: row.deadlineOn,
+        days,
+        daysCopy:
+          days == null
+            ? null
+            : days > 1
+              ? `${days} days left`
+              : days === 1
+                ? "Due tomorrow"
+                : days === 0
+                  ? "Due today"
+                  : `${Math.abs(days)} days late`,
+        noticeLabel: row.noticeType,
+        cityCount: row.cityCount,
+        promise: row.promiseDue
+          ? {
+              id: "live",
+              file_id: file.id,
+              user_id: file.user_id,
+              kind: "promise",
+              amount_cents: null,
+              description: row.promiseText ?? "",
+              statute: "",
+              status: "open",
+              promised_on: row.promiseDue,
+              due_on: row.promiseDue,
+              created_at: "",
+            }
+          : null,
+        headline: row.promiseDue
+          ? `They promised ${formatDay(row.promiseDue)}. That’s a claim.`
+          : row.cityCount
+            ? `Chicago listed ${row.cityCount} open problems on this building.`
+            : days != null
+              ? `${Math.abs(days)} days ${days < 0 ? "late" : "on the notice"}.`
+              : "File the notice. Then pull Chicago.",
+        sub: "",
+      };
+      return { file, pulse };
+    },
+  );
 
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(label);
@@ -66,6 +98,10 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
     } finally {
       setBusy(null);
     }
+  }
+
+  if (rawCards === undefined) {
+    return <div className="min-h-screen bg-paper p-6 text-muted">Opening…</div>;
   }
 
   return (
@@ -146,17 +182,17 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
             disabled={busy !== null}
             onClick={() =>
               void run("seed", async () => {
-                const f = await loadSample(userId);
+                const id = await openDemo({ userId });
                 await navigate({
                   to: "/file/$fileId",
-                  params: { fileId: f.id },
+                  params: { fileId: id },
                   search: { step: "notice" },
                 });
               })
             }
             className="folio-btn"
           >
-            {busy === "seed" ? "Opening…" : "Open 1757 W Berteau — a real building"}
+            {busy === "seed" ? "Opening…" : "Open 1757 W Berteau — notice + Chicago"}
           </button>
           <button
             type="button"

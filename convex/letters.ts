@@ -3,6 +3,7 @@ import { action, mutation } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { COOK, nextStatus } from "./lib";
+import { draftWithModel } from "./ai";
 
 const LABELS = ["A", "B", "C", "D", "E", "F"];
 
@@ -79,8 +80,21 @@ export const propose = action({
       .map((r: { title: string }) => r.title);
     const address = `${file.street}${file.unit ? `, Unit ${file.unit}` : ""}, ${file.city} ${file.state}`;
     const noticeLabel = (notice?.noticeType ?? "notice").replaceAll("_", " ");
-    const subject = `Written demand — ${address} — confirm repairs in writing`;
-    const body = [
+    const drafted = await draftWithModel({
+      tenant,
+      address,
+      inbox: file.caseInbox,
+      owner,
+      violations,
+      noticeLabel,
+      deadlineOn: notice?.deadlineOn ?? null,
+    });
+    const subject =
+      drafted?.subject ??
+      `Written demand — ${address} — confirm repairs in writing`;
+    const body =
+      drafted?.body ??
+      [
       `To: ${owner}`,
       ``,
       `I am the tenant at ${address}. I received a ${noticeLabel} dated ${notice?.servedOn ?? "recently"}.`,

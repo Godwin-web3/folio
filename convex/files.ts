@@ -72,6 +72,34 @@ export const get = query({
   },
 });
 
+export const listCards = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const owned = await ctx.db
+      .query("addressFiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const cards = [];
+    for (const file of owned) {
+      const [notices, records, claims] = await Promise.all([
+        ctx.db.query("notices").withIndex("by_file", (q) => q.eq("fileId", file._id)).collect(),
+        ctx.db.query("records").withIndex("by_file", (q) => q.eq("fileId", file._id)).collect(),
+        ctx.db.query("claims").withIndex("by_file", (q) => q.eq("fileId", file._id)).collect(),
+      ]);
+      const promise = claims.find((c) => c.kind === "promise");
+      cards.push({
+        file,
+        deadlineOn: notices[0]?.deadlineOn ?? null,
+        noticeType: notices[0]?.noticeType ?? null,
+        cityCount: records.filter((r) => r.kind === "violation").length,
+        promiseDue: promise?.dueOn ?? null,
+        promiseText: promise?.description ?? null,
+      });
+    }
+    return cards;
+  },
+});
+
 export const create = mutation({
   args: {
     userId: v.string(),

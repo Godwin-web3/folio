@@ -6,7 +6,7 @@ import { FolioMark } from "@/components/marks";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
-function Login() {
+export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +31,8 @@ function Login() {
     }
   }
 
-  const onVercel = host.endsWith("vercel.app");
+  const onPublic =
+    host.endsWith("vercel.app") || host.endsWith("convex.site");
 
   async function submit(mode: "in" | "up") {
     setBusy(true);
@@ -71,7 +72,7 @@ function Login() {
           className="mt-8 space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            if (onVercel) void continueGuest();
+            if (onPublic) void continueGuest();
             else void submit("in");
           }}
         >
@@ -88,7 +89,7 @@ function Login() {
               required
             />
           </label>
-          {!onVercel ? (
+          {!onPublic ? (
             <label className="block space-y-1">
               <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
                 Password
@@ -116,9 +117,9 @@ function Login() {
           </label>
           {err ? <p className="text-sm text-stamp">{err}</p> : null}
           <button type="submit" disabled={busy} className="folio-btn">
-            {busy ? "Opening…" : onVercel ? "Open my files" : "Sign in"}
+            {busy ? "Opening…" : onPublic ? "Open my files" : "Sign in"}
           </button>
-          {!onVercel ? (
+          {!onPublic ? (
             <button
               type="button"
               disabled={busy}
@@ -130,7 +131,7 @@ function Login() {
           ) : null}
         </form>
         <div className="mt-4 space-y-2">
-          {authEnabled && !onVercel && host
+          {authEnabled && !onPublic && host
             ? GROK_PROVIDERS.map((p) => (
                 <button
                   key={p.providerId}
@@ -141,7 +142,7 @@ function Login() {
                   Continue with {p.label}
                 </button>
               ))
-            : onVercel
+            : onPublic
               ? (
                 <p className="text-sm text-muted">
                   Use the email you’ll put on the letter. No password on this

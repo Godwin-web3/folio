@@ -1,9 +1,24 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
+import { FolioConvex } from "@/lib/open-address/convex-react";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Folio";
+const spa = import.meta.env.VITE_FOLIO_SPA === "1";
+
+function Shell() {
+  return (
+    <>
+      <PreviewHostBridge />
+      <FolioConvex>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </FolioConvex>
+    </>
+  );
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -25,18 +40,18 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
-  component: () => (
-    <html lang="en" className="antialiased">
-      <head>
-        <HeadContent />
-      </head>
-      <body className="font-sans bg-paper text-ink min-h-screen">
-        <PreviewHostBridge />
-        <AuthProvider>
-          <Outlet />
-        </AuthProvider>
-        <Scripts />
-      </body>
-    </html>
-  ),
+  component: () =>
+    spa ? (
+      <Shell />
+    ) : (
+      <html lang="en" className="antialiased">
+        <head>
+          <HeadContent />
+        </head>
+        <body className="font-sans bg-paper text-ink min-h-screen">
+          <Shell />
+          <Scripts />
+        </body>
+      </html>
+    ),
 });

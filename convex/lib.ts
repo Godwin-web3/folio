@@ -9,6 +9,18 @@ export const COOK = {
   violationsApi: "https://data.cityofchicago.org/resource/22u3-xenr.json",
   licensesApi: "https://data.cityofchicago.org/resource/r5kz-chrr.json",
   buildingsUrl: "https://data.cityofchicago.org/Buildings/Building-Violations/22u3-xenr",
+  demoNotice: `FIVE DAY NOTICE
+
+TO: Maya Chen
+PREMISES: 1757 W Berteau Ave, Apt 2F, Chicago, IL 60613
+
+You are hereby notified that there is now due the undersigned landlord the sum of ONE THOUSAND EIGHT HUNDRED FORTY AND 00/100 DOLLARS ($1,840.00) being rent for the period of August 2026 for the above premises.
+
+Unless payment of the above sum is made on or before five (5) days after service of this notice, your lease will be terminated.
+
+LANDLORD: Northside Residential LLC
+c/o Harbor Property Group
+Date of service: September 1, 2026`,
 } as const;
 
 export function todayIso(d = new Date()): string {
