@@ -23,6 +23,42 @@ c/o Harbor Property Group
 Date of service: September 1, 2026`,
 } as const;
 
+export const SAMPLES = {
+  berteau: {
+    key: "cook-berteau-2f",
+    street: "1757 W Berteau Ave",
+    unit: "2F",
+    zip: "60613",
+    tenantName: "Maya Chen",
+    tenantEmail: "maya.chen@example.com",
+    ownerName: "Northside Residential LLC",
+    ownerEmail: "notices@northside-residential.example",
+    withNotice: true,
+  },
+  lincoln: {
+    key: "cook-lincoln-5074",
+    street: "5074 N Lincoln Ave",
+    unit: "",
+    zip: "60625",
+    tenantName: "Jordan Hale",
+    tenantEmail: "jordan.hale@example.com",
+    ownerName: "Lincoln Court LLC",
+    ownerEmail: "notices@lincoln-court.example",
+    withNotice: false,
+  },
+  peoria: {
+    key: "cook-peoria-7243",
+    street: "7243 S Peoria St",
+    unit: "",
+    zip: "60621",
+    tenantName: "Aisha Brooks",
+    tenantEmail: "aisha.brooks@example.com",
+    ownerName: "Southside Holdings LLC",
+    ownerEmail: "notices@southside-holdings.example",
+    withNotice: false,
+  },
+} as const;
+
 export function todayIso(d = new Date()): string {
   return d.toISOString().slice(0, 10);
 }

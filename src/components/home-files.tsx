@@ -182,7 +182,7 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
             disabled={busy !== null}
             onClick={() =>
               void run("seed", async () => {
-                const id = await openDemo({ userId });
+                const id = await openDemo({ userId, sample: "berteau" });
                 await navigate({
                   to: "/file/$fileId",
                   params: { fileId: id },
@@ -194,9 +194,46 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
           >
             {busy === "seed" ? "Opening…" : "Open 1757 W Berteau — notice + Chicago"}
           </button>
+          <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            More real Chicago buildings
+          </p>
           <button
             type="button"
+            disabled={busy !== null}
+            onClick={() =>
+              void run("lincoln", async () => {
+                const id = await openDemo({ userId, sample: "lincoln" });
+                await navigate({
+                  to: "/file/$fileId",
+                  params: { fileId: id },
+                  search: { step: "notice" },
+                });
+              })
+            }
             className="folio-btn-ghost w-full"
+          >
+            {busy === "lincoln" ? "Pulling…" : "5074 N Lincoln Ave — North Side"}
+          </button>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() =>
+              void run("peoria", async () => {
+                const id = await openDemo({ userId, sample: "peoria" });
+                await navigate({
+                  to: "/file/$fileId",
+                  params: { fileId: id },
+                  search: { step: "notice" },
+                });
+              })
+            }
+            className="folio-btn-ghost w-full"
+          >
+            {busy === "peoria" ? "Pulling…" : "7243 S Peoria St — South Side"}
+          </button>
+          <button
+            type="button"
+            className="w-full py-2 text-sm font-medium text-muted"
             onClick={() => setOpenForm((v) => !v)}
           >
             {openForm ? "Hide the form" : "Start a file on my street"}

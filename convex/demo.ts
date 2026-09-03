@@ -2,40 +2,44 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { COOK } from "./lib";
+import { COOK, SAMPLES } from "./lib";
 
 export const openCase = action({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<Id<"addressFiles">> => {
+  args: {
+    userId: v.string(),
+    sample: v.optional(v.union(v.literal("berteau"), v.literal("lincoln"), v.literal("peoria"))),
+  },
+  handler: async (ctx, { userId, sample }): Promise<Id<"addressFiles">> => {
+    const house = SAMPLES[sample ?? "berteau"];
     const existing = await ctx.runQuery(api.files.findDemo, {
       userId,
-      demoKey: "cook-berteau-2f",
+      demoKey: house.key,
     });
     const fileId =
       existing?._id ??
       (await ctx.runAction(api.open.openFile, {
         userId,
-        street: "1757 W Berteau Ave",
-        unit: "2F",
+        street: house.street,
+        unit: house.unit,
         city: "Chicago",
         state: "IL",
-        zip: "60613",
-        tenantName: "Maya Chen",
-        tenantEmail: "maya.chen@example.com",
-        ownerName: "Northside Residential LLC",
-        ownerEmail: "notices@northside-residential.example",
+        zip: house.zip,
+        tenantName: house.tenantName,
+        tenantEmail: house.tenantEmail,
+        ownerName: house.ownerName,
+        ownerEmail: house.ownerEmail,
         clinicEmail: "housing@illinoislegalaid.org",
-        demoKey: "cook-berteau-2f",
+        demoKey: house.key,
       }));
     const bundle = await ctx.runQuery(api.files.get, { userId, fileId });
-    if (bundle.notices.length === 0) {
+    if (house.withNotice && bundle.notices.length === 0) {
       await ctx.runMutation(api.files.ingestNotice, {
         userId,
         fileId,
         noticeType: "5_day_pay_or_quit",
         servedOn: "2026-09-01",
         deadlineOn: "2026-09-06",
-        plaintiff: "Northside Residential LLC",
+        plaintiff: house.ownerName,
         amountCents: 184000,
         reason: "nonpayment of rent",
         rawText: COOK.demoNotice,
