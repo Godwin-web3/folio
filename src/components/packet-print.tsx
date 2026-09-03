@@ -1,20 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAddressFile } from "@/lib/open-address/api";
+import { getFile } from "@/lib/open-address/data";
+import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import type { FileBundle } from "@/lib/open-address/types";
 
 export function PacketPrint({ fileId }: { fileId: string }) {
+  const { session, isPending } = useFolioSession();
   const [bundle, setBundle] = useState<FileBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void getAddressFile({ data: { fileId } })
+    if (!session) return;
+    void getFile(session.userId, fileId)
       .then(setBundle)
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "Could not load packet"),
       );
-  }, [fileId]);
+  }, [fileId, session]);
+
+  if (isPending) return <p className="p-6 text-muted">Loading packet…</p>;
+  if (!session) return <p className="p-6 text-muted">Sign in to print this packet.</p>;
 
   if (error) return <p className="p-6 text-stamp">{error}</p>;
   if (!bundle) return <p className="p-6 text-muted">Loading packet…</p>;

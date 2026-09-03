@@ -2,17 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { RedirectToSignIn } from "@/lib/auth/gates";
 import {
-  RedirectToSignIn,
-  SignedIn,
-  SignedOut,
-} from "@/lib/auth/gates";
-import { useCurrentUser, useCurrentUserState } from "@/lib/auth/use-current-user";
-import {
-  createAddressFile,
-  listAddressFiles,
-  seedDemoFn,
-} from "@/lib/open-address/api";
+  listFiles,
+  loadSample,
+  openFile,
+} from "@/lib/open-address/data";
+import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
   recommendedStep,
@@ -22,26 +18,15 @@ import type { AddressFile } from "@/lib/open-address/types";
 import { AppHeader, Field, StepRail } from "@/components/app-shell";
 
 export function HomeFiles() {
-  const { user, isPending } = useCurrentUserState();
+  const { session, isPending } = useFolioSession();
   if (isPending) {
     return <div className="min-h-screen bg-paper p-6 text-muted">Loading…</div>;
   }
-  if (!user) {
-    return (
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    );
-  }
-  return (
-    <SignedIn>
-      <HomeShell />
-    </SignedIn>
-  );
+  if (!session) return <RedirectToSignIn />;
+  return <HomeShell userId={session.userId} name={session.name} />;
 }
 
-function HomeShell() {
-  const user = useCurrentUser();
+function HomeShell({ userId, name }: { userId: string; name: string }) {
   const navigate = useNavigate();
   const [files, setFiles] = useState<AddressFile[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -49,14 +34,14 @@ function HomeShell() {
   const [street, setStreet] = useState("");
   const [unit, setUnit] = useState("");
   const [zip, setZip] = useState("");
-  const [tenantName, setTenantName] = useState(user?.displayName ?? "");
+  const [tenantName, setTenantName] = useState(name);
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
 
   const refresh = useCallback(async () => {
-    setFiles(await listAddressFiles());
-  }, []);
+    setFiles(await listFiles(userId));
+  }, [userId]);
 
   useEffect(() => {
     void refresh().catch((err: unknown) =>
@@ -80,38 +65,29 @@ function HomeShell() {
     <div className="min-h-screen bg-paper text-ink">
       <AppHeader subtitle="Cook County" title="Folio" />
       <StepRail step="open" />
-      <main className="mx-auto max-w-lg space-y-8 px-4 py-6 pb-16">
+      <main className="mx-auto max-w-lg space-y-6 px-4 py-6">
+        <h2 className="font-serif text-2xl">Your apartment, one file</h2>
         {error ? (
           <p className="border border-stamp bg-panel px-3 py-2 text-sm text-stamp">
             {error}
           </p>
         ) : null}
 
-        <section>
-          <h2 className="font-serif text-3xl leading-tight">
-            Your apartment, one file
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
-            Put the notice on the docket. Pull what Chicago already published.
-            Email the landlord from your phone. Print a packet for legal aid.
-          </p>
-        </section>
-
-        {files.length > 0 ? (
-          <section className="space-y-2">
+        {files.length ? (
+          <section>
             <h3 className="text-xs uppercase tracking-widest text-muted">
-              Your files
+              Open files
             </h3>
-            <ul className="space-y-2">
+            <ul className="mt-2 divide-y divide-rule border border-rule">
               {files.map((f) => (
                 <li key={f.id}>
                   <Link
                     to="/file/$fileId"
                     params={{ fileId: f.id }}
                     search={{ step: recommendedStep(f.status) }}
-                    className="block min-h-11 rounded-lg border border-rule bg-panel px-4 py-3"
+                    className="flex min-h-14 items-center justify-between px-3 py-3"
                   >
-                    <span className="block font-medium">{addressLabel(f)}</span>
+                    <span className="font-medium">{addressLabel(f)}</span>
                     <span className="text-sm text-muted">
                       {statusLabel(f.status)}
                     </span>
@@ -127,18 +103,16 @@ function HomeShell() {
           onSubmit={(e) => {
             e.preventDefault();
             void run("create", async () => {
-              const f = await createAddressFile({
-                data: {
-                  street,
-                  unit,
-                  city: "Chicago",
-                  state: "IL",
-                  zip,
-                  tenantName,
-                  ownerName,
-                  ownerEmail,
-                  clinicEmail,
-                },
+              const f = await openFile(userId, {
+                street,
+                unit,
+                city: "Chicago",
+                state: "IL",
+                zip,
+                tenantName,
+                ownerName,
+                ownerEmail,
+                clinicEmail,
               });
               await navigate({
                 to: "/file/$fileId",
@@ -224,7 +198,7 @@ function HomeShell() {
           disabled={busy !== null}
           onClick={() =>
             void run("seed", async () => {
-              const f = await seedDemoFn();
+              const f = await loadSample(userId);
               await navigate({
                 to: "/file/$fileId",
                 params: { fileId: f.id },

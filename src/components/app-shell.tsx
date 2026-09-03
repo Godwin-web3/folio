@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { UserButton } from "@/lib/auth/gates";
 import { FILE_STEPS, type FileStep } from "@/lib/open-address/flow";
+import { useFolioSession } from "@/lib/open-address/use-folio-session";
 
 export function AppHeader({
   subtitle,
@@ -18,8 +19,28 @@ export function AppHeader({
         <p className="text-xs uppercase tracking-widest text-stamp">{subtitle}</p>
         <h1 className="truncate font-serif text-2xl leading-none">{title}</h1>
       </Link>
-      <UserButton />
+      <FolioAccount />
     </header>
+  );
+}
+
+function FolioAccount() {
+  const { session, signOutGuest } = useFolioSession();
+  if (!session) return <UserButton />;
+  if (session.kind === "auth") return <UserButton />;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="grid h-8 w-8 place-items-center rounded-full bg-black/10 text-sm font-medium">
+        {session.name.charAt(0).toUpperCase()}
+      </span>
+      <button
+        type="button"
+        onClick={signOutGuest}
+        className="text-sm underline-offset-4 opacity-70 hover:underline"
+      >
+        Sign out
+      </button>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
+import { saveGuest } from "@/lib/open-address/folio-user";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -15,7 +16,21 @@ function Login() {
   useEffect(() => {
     setHost(window.location.hostname);
   }, []);
-  const socialOk = Boolean(host) && !host.endsWith("vercel.app");
+  async function continueGuest() {
+    setBusy(true);
+    setErr(null);
+    try {
+      if (!email.includes("@")) throw new Error("Enter a real email");
+      saveGuest({ email, name: name || email.split("@")[0] });
+      await navigate({ to: "/" });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not continue");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const onVercel = host.endsWith("vercel.app");
 
   async function submit(mode: "in" | "up") {
     setBusy(true);
@@ -51,7 +66,8 @@ function Login() {
           className="mt-8 space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            void submit("in");
+            if (onVercel) void continueGuest();
+            else void submit("in");
           }}
         >
           <label className="block space-y-1">
@@ -68,19 +84,21 @@ function Login() {
               required
             />
           </label>
-          <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-widest text-muted">
-              Password
-            </span>
-            <input
-              className="w-full min-h-11 rounded-sm border border-rule bg-panel px-3 text-sm"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
+          {!onVercel ? (
+            <label className="block space-y-1">
+              <span className="text-xs uppercase tracking-widest text-muted">
+                Password
+              </span>
+              <input
+                className="w-full min-h-11 rounded-sm border border-rule bg-panel px-3 text-sm"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+          ) : null}
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-widest text-muted">
               Name
@@ -99,19 +117,21 @@ function Login() {
             disabled={busy}
             className="w-full min-h-11 rounded-sm bg-ink text-sm text-paper"
           >
-            {busy ? "Working…" : "Sign in"}
+            {busy ? "Working…" : onVercel ? "Continue" : "Sign in"}
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void submit("up")}
-            className="w-full min-h-11 rounded-sm border border-ink text-sm"
-          >
-            Create account
-          </button>
+          {!onVercel ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void submit("up")}
+              className="w-full min-h-11 rounded-sm border border-ink text-sm"
+            >
+              Create account
+            </button>
+          ) : null}
         </form>
         <div className="mt-4 space-y-2">
-          {authEnabled && socialOk ? (
+          {authEnabled && !onVercel && host ? (
             GROK_PROVIDERS.map((p) => (
               <button
                 key={p.providerId}
@@ -122,10 +142,10 @@ function Login() {
                 Continue with {p.label}
               </button>
             ))
-          ) : authEnabled && host.endsWith("vercel.app") ? (
+          ) : onVercel ? (
             <p className="text-sm text-muted">
-              On this link use email and password — Create account, then Sign
-              in. Google and X are for the Grok preview.
+              Enter the email you’ll use for this file. No password on this
+              link.
             </p>
           ) : !authEnabled ? (
             <p className="text-sm text-muted">Sign-in is disabled.</p>

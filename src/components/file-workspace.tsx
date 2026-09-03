@@ -2,21 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { RedirectToSignIn } from "@/lib/auth/gates";
 import {
-  RedirectToSignIn,
-  SignedIn,
-  SignedOut,
-} from "@/lib/auth/gates";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import {
-  approveSendFn,
-  assemblePacketFn,
-  crawlBuildingFn,
-  getAddressFile,
-  ingestNoticeFn,
-  logInboundFn,
-  proposeDefenseFn,
-} from "@/lib/open-address/api";
+  buildPacket,
+  draftLetters,
+  getFile,
+  ingestNotice,
+  logReply,
+  pullBuilding,
+  sendLetter,
+} from "@/lib/open-address/data";
+import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
   deadlineCopy,
@@ -34,25 +30,23 @@ export function FileWorkspace({
   fileId: string;
   step: FileStep;
 }) {
-  const { user, isPending } = useCurrentUserState();
+  const { session, isPending } = useFolioSession();
   if (isPending) {
     return <div className="min-h-screen bg-paper p-6 text-muted">Loading…</div>;
   }
-  if (!user) {
-    return (
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    );
-  }
-  return (
-    <SignedIn>
-      <FileShell fileId={fileId} step={step} />
-    </SignedIn>
-  );
+  if (!session) return <RedirectToSignIn />;
+  return <FileShell fileId={fileId} step={step} userId={session.userId} />;
 }
 
-function FileShell({ fileId, step }: { fileId: string; step: FileStep }) {
+function FileShell({
+  fileId,
+  step,
+  userId,
+}: {
+  fileId: string;
+  step: FileStep;
+  userId: string;
+}) {
   const navigate = useNavigate();
   const [bundle, setBundle] = useState<FileBundle | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -61,8 +55,8 @@ function FileShell({ fileId, step }: { fileId: string; step: FileStep }) {
   const [replyText, setReplyText] = useState("");
 
   const load = useCallback(async () => {
-    setBundle(await getAddressFile({ data: { fileId } }));
-  }, [fileId]);
+    setBundle(await getFile(userId, fileId));
+  }, [fileId, userId]);
 
   useEffect(() => {
     void load().catch((err: unknown) =>
@@ -123,16 +117,14 @@ function FileShell({ fileId, step }: { fileId: string; step: FileStep }) {
             setNoticeText={setNoticeText}
             onIngest={() =>
               void run("notice", async () => {
-                await ingestNoticeFn({
-                  data: { fileId, rawText: noticeText },
-                });
+                await ingestNotice(userId, fileId, noticeText);
                 setNoticeText("");
                 await load();
               })
             }
             onCrawl={() =>
               void run("crawl", async () => {
-                await crawlBuildingFn({ data: { fileId } });
+                await pullBuilding(userId, fileId);
                 await load();
               })
             }
@@ -153,13 +145,13 @@ function FileShell({ fileId, step }: { fileId: string; step: FileStep }) {
             setReplyText={setReplyText}
             onDraft={() =>
               void run("draft", async () => {
-                await proposeDefenseFn({ data: { fileId } });
+                await draftLetters(userId, fileId);
                 await load();
               })
             }
             onSend={(messageId) =>
               void run("send", async () => {
-                const sent = await approveSendFn({ data: { messageId } });
+                const sent = await sendLetter(userId, messageId);
                 if (!bundle.file.mail_inbox_id) {
                   const href = mailtoHref(sent);
                   if (href) window.location.href = href;
@@ -169,7 +161,7 @@ function FileShell({ fileId, step }: { fileId: string; step: FileStep }) {
             }
             onInbound={() =>
               void run("inbound", async () => {
-                await logInboundFn({ data: { fileId, body: replyText } });
+                await logReply(userId, fileId, replyText);
                 setReplyText("");
                 await load();
               })
@@ -189,7 +181,7 @@ function FileShell({ fileId, step }: { fileId: string; step: FileStep }) {
             busy={busy}
             onPacket={() =>
               void run("packet", async () => {
-                await assemblePacketFn({ data: { fileId } });
+                await buildPacket(userId, fileId);
                 await load();
               })
             }
