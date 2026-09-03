@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 
@@ -11,6 +11,11 @@ function Login() {
   const [name, setName] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [host, setHost] = useState("");
+  useEffect(() => {
+    setHost(window.location.hostname);
+  }, []);
+  const socialOk = Boolean(host) && !host.endsWith("vercel.app");
 
   async function submit(mode: "in" | "up") {
     setBusy(true);
@@ -106,7 +111,7 @@ function Login() {
           </button>
         </form>
         <div className="mt-4 space-y-2">
-          {authEnabled ? (
+          {authEnabled && socialOk ? (
             GROK_PROVIDERS.map((p) => (
               <button
                 key={p.providerId}
@@ -117,9 +122,14 @@ function Login() {
                 Continue with {p.label}
               </button>
             ))
-          ) : (
+          ) : authEnabled && host.endsWith("vercel.app") ? (
+            <p className="text-sm text-muted">
+              On this link use email and password — Create account, then Sign
+              in. Google and X are for the Grok preview.
+            </p>
+          ) : !authEnabled ? (
             <p className="text-sm text-muted">Sign-in is disabled.</p>
-          )}
+          ) : null}
         </div>
         <p className="mt-8 text-xs text-muted">
           Not a lawyer. Does not file in court.
