@@ -89,7 +89,7 @@ function FileShell({
       <StepRail fileId={fileId} step={step} />
       <main className="mx-auto max-w-lg px-4 py-6 pb-28">
         {error ? (
-          <p className="mb-4 border border-stamp bg-panel px-3 py-2 text-sm text-stamp">
+          <p className="folio-card mb-4 px-4 py-3 text-sm text-stamp">
             {error}
           </p>
         ) : null}
@@ -207,8 +207,8 @@ function NoticeScreen({
       <section className="space-y-3">
         <h3 className="font-serif text-xl">What was on the door</h3>
         {notice ? (
-          <div className="border border-ink bg-panel px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-stamp">
+          <div className="folio-card px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stamp">
               On file
             </p>
             <p className="mt-1 font-serif text-2xl leading-none">
@@ -259,7 +259,7 @@ function NoticeScreen({
             to your notice so the letter is not just your word.
           </p>
         ) : (
-          <ol className="divide-y divide-rule border border-rule bg-panel">
+          <ol className="folio-card divide-y divide-rule overflow-hidden">
             {violations.map((r, i) => (
               <li key={r.id} className="flex gap-3 px-3 py-3">
                 <span className="w-6 shrink-0 font-serif text-lg tabular-nums text-stamp">
@@ -279,7 +279,7 @@ function NoticeScreen({
         type="button"
         disabled={!ready}
         onClick={onNext}
-        className="fixed inset-x-0 bottom-0 z-10 min-h-12 bg-filed text-sm text-paper disabled:bg-rule sm:static sm:w-full"
+        className="fixed inset-x-0 bottom-0 z-10 min-h-14 bg-filed text-sm font-semibold text-paper disabled:bg-rule sm:static sm:w-full sm:rounded-full"
       >
         Write the letter
       </button>
@@ -340,7 +340,7 @@ function LettersScreen({
       <section className="space-y-3">
         <h3 className="font-serif text-xl">If they name a day</h3>
         {promise ? (
-          <div className="border border-stamp bg-panel px-4 py-4">
+          <div className="folio-card border-stamp/40 px-4 py-4">
             <p className="text-[10px] uppercase tracking-[0.16em] text-stamp">
               Claim
             </p>
@@ -387,7 +387,7 @@ function LettersScreen({
         type="button"
         disabled={!sent && !promise && bundle.messages.length === 0}
         onClick={onNext}
-        className="fixed inset-x-0 bottom-0 z-10 min-h-12 bg-filed text-sm text-paper disabled:bg-rule sm:static sm:w-full"
+        className="fixed inset-x-0 bottom-0 z-10 min-h-14 bg-filed text-sm font-semibold text-paper disabled:bg-rule sm:static sm:w-full sm:rounded-full"
       >
         Make the packet
       </button>
@@ -406,7 +406,7 @@ function MailCard({
 }) {
   const href = mailtoHref(m);
   return (
-    <li className="border border-rule bg-panel p-4 text-sm">
+    <li className="folio-card p-4 text-sm">
       <div className="text-[10px] uppercase tracking-[0.16em] text-muted">
         {m.status === "sent" ? "Sent" : m.status === "pending_approval" ? "Waiting on you" : statusLabel(m.status)}
         {m.classification === "demand" ? " · Demand" : ""}
@@ -476,7 +476,7 @@ function PacketScreen({
           {busy === "packet" ? "Binding…" : "Build the packet"}
         </button>
       ) : (
-        <ol className="divide-y divide-rule border border-rule bg-panel">
+        <ol className="folio-card divide-y divide-rule overflow-hidden">
           {bundle.exhibits.map((e) => (
             <li key={e.id} className="flex items-baseline gap-3 px-4 py-3">
               <span className="font-serif text-xl text-stamp">{e.label}</span>
@@ -489,7 +489,7 @@ function PacketScreen({
         <Link
           to="/packet/$fileId"
           params={{ fileId: bundle.file.id }}
-          className="flex min-h-12 items-center justify-center bg-filed text-sm text-paper"
+          className="flex min-h-14 items-center justify-center rounded-full bg-filed text-sm font-semibold text-paper"
         >
           Print / save PDF
         </Link>

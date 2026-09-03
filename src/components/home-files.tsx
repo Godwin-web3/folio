@@ -120,44 +120,44 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
         </p>
 
         {error ? (
-          <p className="mt-4 border border-stamp bg-panel px-3 py-2 text-sm text-stamp">
+          <p className="folio-card mt-4 px-4 py-3 text-sm text-stamp">
             {error}
           </p>
         ) : null}
 
         {cards.length ? (
-          <ul className="mt-8 divide-y divide-rule border border-rule bg-panel">
+          <ul className="mt-8 space-y-3">
             {cards.map(({ file, pulse }) => (
               <li key={file.id}>
                 <Link
                   to="/file/$fileId"
                   params={{ fileId: file.id }}
                   search={{ step: recommendedStepFromPulse(pulse) }}
-                  className="flex min-h-16 items-stretch gap-3"
+                  className="folio-card flex min-h-20 items-stretch overflow-hidden"
                 >
                   <span
-                    className={`flex w-16 shrink-0 flex-col items-center justify-center ${
+                    className={`flex w-[4.5rem] shrink-0 flex-col items-center justify-center ${
                       pulse.days != null && pulse.days <= 2
                         ? "bg-stamp text-paper"
-                        : "bg-chip text-ink"
+                        : "bg-filed text-paper"
                     }`}
                   >
-                    <span className="font-serif text-2xl leading-none tabular-nums">
+                    <span className="font-serif text-3xl leading-none tabular-nums">
                       {pulse.days != null ? Math.abs(pulse.days) : "—"}
                     </span>
-                    <span className="text-[9px] uppercase tracking-wider">
+                    <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider">
                       {pulse.days == null
-                        ? "days"
+                        ? "open"
                         : pulse.days < 0
                           ? "late"
                           : "left"}
                     </span>
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col justify-center py-3 pr-3">
-                    <span className="truncate font-medium">
+                  <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
+                    <span className="truncate font-semibold">
                       {addressLabel(file)}
                     </span>
-                    <span className="truncate text-xs text-muted">
+                    <span className="mt-0.5 truncate text-sm text-muted">
                       {pulse.headline}
                     </span>
                   </span>
@@ -166,10 +166,10 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
             ))}
           </ul>
         ) : (
-          <div className="mt-8 border border-rule bg-panel px-4 py-5">
-            <FolioMark className="text-stamp" size={28} />
-            <p className="mt-3 font-serif text-xl">No file yet.</p>
-            <p className="mt-1 text-sm text-muted">
+          <div className="folio-card mt-8 px-5 py-6">
+            <FolioMark className="text-filed" size={28} />
+            <p className="mt-3 font-serif text-2xl">No file yet.</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">
               Start with the street. Or open a real Chicago building and see how
               the city already listed it.
             </p>
@@ -205,7 +205,7 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
 
         {openForm ? (
           <form
-            className="mt-6 space-y-3 border border-rule bg-panel p-4"
+            className="folio-card mt-6 space-y-3 p-4"
             onSubmit={(e) => {
               e.preventDefault();
               void run("create", async () => {

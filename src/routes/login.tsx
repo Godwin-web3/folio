@@ -54,14 +54,16 @@ export function Login() {
   }
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-14 text-ink">
+    <main className="min-h-screen bg-paper px-5 py-16 text-ink">
       <div className="mx-auto w-full max-w-sm">
-        <FolioMark className="text-stamp" size={36} />
-        <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-stamp">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-filed text-paper">
+          <FolioMark className="text-paper" size={26} />
+        </span>
+        <p className="mt-6 text-xs font-semibold tracking-wide text-filed">
           Cook County
         </p>
-        <h1 className="mt-1 font-serif text-5xl leading-none">Folio</h1>
-        <p className="mt-4 text-[1.05rem] leading-snug text-ink">
+        <h1 className="mt-1 font-serif text-5xl leading-[0.95]">Folio</h1>
+        <p className="mt-4 text-lg leading-snug text-ink">
           The city’s file. Their date. Your clock.
         </p>
         <p className="mt-3 text-sm leading-relaxed text-muted">
@@ -69,7 +71,7 @@ export function Login() {
           If they name a Friday, that Friday is a claim.
         </p>
         <form
-          className="mt-8 space-y-3"
+          className="folio-card mt-8 space-y-4 p-5"
           onSubmit={(e) => {
             e.preventDefault();
             if (onPublic) void continueGuest();

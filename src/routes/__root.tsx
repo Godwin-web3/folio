@@ -31,7 +31,7 @@ export const Route = createRootRoute({
         content:
           "The city’s file, the date they named, and the notice on your door — one Cook County file.",
       },
-      { name: "theme-color", content: "#efe6d3" },
+      { name: "theme-color", content: "#f3f1eb" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -48,7 +48,7 @@ export const Route = createRootRoute({
         <head>
           <HeadContent />
         </head>
-        <body className="font-sans bg-paper text-ink min-h-screen">
+        <body className="font-sans bg-paper text-ink min-h-screen antialiased">
           <Shell />
           <Scripts />
         </body>
