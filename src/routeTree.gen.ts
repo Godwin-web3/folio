@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FilesRouteImport } from './routes/files'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FileFileIdRouteImport } from './routes/file.$fileId'
 import { Route as PacketFileIdRouteImport } from './routes/packet.$fileId'
@@ -19,6 +20,11 @@ import { Route as ApiMailWebhookRouteImport } from './routes/api/mail/webhook'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilesRoute = FilesRouteImport.update({
+  id: '/files',
+  path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -49,6 +55,7 @@ const ApiMailWebhookRoute = ApiMailWebhookRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/files': typeof FilesRoute
   '/login': typeof LoginRoute
   '/file/$fileId': typeof FileFileIdRoute
   '/packet/$fileId': typeof PacketFileIdRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/files': typeof FilesRoute
   '/login': typeof LoginRoute
   '/file/$fileId': typeof FileFileIdRoute
   '/packet/$fileId': typeof PacketFileIdRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/files': typeof FilesRoute
   '/login': typeof LoginRoute
   '/file/$fileId': typeof FileFileIdRoute
   '/packet/$fileId': typeof PacketFileIdRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/files'
     | '/login'
     | '/file/$fileId'
     | '/packet/$fileId'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/files'
     | '/login'
     | '/file/$fileId'
     | '/packet/$fileId'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/files'
     | '/login'
     | '/file/$fileId'
     | '/packet/$fileId'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FilesRoute: typeof FilesRoute
   LoginRoute: typeof LoginRoute
   FileFileIdRoute: typeof FileFileIdRoute
   PacketFileIdRoute: typeof PacketFileIdRoute
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/files': {
+      id: '/files'
+      path: '/files'
+      fullPath: '/files'
+      preLoaderRoute: typeof FilesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FilesRoute: FilesRoute,
   LoginRoute: LoginRoute,
   FileFileIdRoute: FileFileIdRoute,
   PacketFileIdRoute: PacketFileIdRoute,

@@ -16,7 +16,7 @@ export function AppHeader({
 }) {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-rule/80 bg-paper/90 px-4 py-3 backdrop-blur-md">
-      <Link to="/" className="flex min-w-0 items-center gap-2.5 text-ink">
+      <Link to="/files" className="flex min-w-0 items-center gap-2.5 text-ink">
         <span className="grid h-9 w-9 place-items-center rounded-full bg-filed text-paper">
           <FolioMark className="text-paper" size={20} />
         </span>
@@ -73,7 +73,7 @@ export function StepRail({
           }`;
           if (t.toHome) {
             return (
-              <Link key={t.id} to="/" activeOptions={{ exact: true }} className={cls}>
+              <Link key={t.id} to="/files" className={cls}>
                 {t.label}
               </Link>
             );

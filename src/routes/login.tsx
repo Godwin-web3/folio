@@ -23,7 +23,7 @@ export function Login() {
     try {
       if (!email.includes("@")) throw new Error("Enter the email you actually use");
       saveGuest({ email, name: name || email.split("@")[0] });
-      await navigate({ to: "/" });
+      await navigate({ to: "/files" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not continue");
     } finally {
@@ -45,7 +45,7 @@ export function Login() {
         const res = await authClient.signIn.email({ email, password });
         if (res.error) throw new Error(res.error.message);
       }
-      await navigate({ to: "/" });
+      await navigate({ to: "/files" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Sign-in failed");
     } finally {

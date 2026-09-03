@@ -49,7 +49,7 @@ export function useFolioSession(): {
       isPending: false,
       signOutGuest: () => {
         clearGuest();
-        window.location.href = "/login";
+        window.location.href = "/";
       },
     };
   }

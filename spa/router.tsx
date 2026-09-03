@@ -3,6 +3,7 @@ import {
   createRoute,
 } from "@tanstack/react-router";
 import { Route as rootRoute } from "./root";
+import { Landing } from "@/components/landing";
 import { HomeFiles } from "@/components/home-files";
 import { FileWorkspace } from "@/components/file-workspace";
 import { PacketPrint } from "@/components/packet-print";
@@ -12,6 +13,12 @@ import { parseFileStep } from "@/lib/open-address/flow";
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  component: Landing,
+});
+
+const filesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/files",
   component: HomeFiles,
 });
 
@@ -45,6 +52,7 @@ const packetRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  filesRoute,
   loginRoute,
   fileRoute,
   packetRoute,
