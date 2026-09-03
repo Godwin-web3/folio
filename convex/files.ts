@@ -88,6 +88,7 @@ export const create = mutation({
     caseInbox: v.optional(v.string()),
     mailInboxId: v.optional(v.string()),
     mailProvider: v.optional(v.string()),
+    demoKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const inbox = args.caseInbox || caseInbox(args.street, args.unit);
@@ -103,6 +104,7 @@ export const create = mutation({
       caseInbox: inbox,
       mailInboxId: args.mailInboxId,
       mailProvider: args.mailProvider || "mailto",
+      demoKey: args.demoKey,
     });
     if (args.tenantName.trim()) {
       await ctx.db.insert("parties", {
@@ -215,6 +217,18 @@ export const setStatus = mutation({
     const file = await ctx.db.get(fileId);
     if (!file) throw new Error("File not found");
     await ctx.db.patch(fileId, { status: nextStatus(file.status, status) });
+  },
+});
+
+export const findDemo = query({
+  args: { userId: v.string(), demoKey: v.string() },
+  handler: async (ctx, { userId, demoKey }) => {
+    return ctx.db
+      .query("addressFiles")
+      .withIndex("by_user_demo", (q) =>
+        q.eq("userId", userId).eq("demoKey", demoKey),
+      )
+      .first();
   },
 });
 

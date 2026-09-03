@@ -15,7 +15,10 @@ type Crawled = {
 async function soda<T>(url: string): Promise<T[]> {
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Folio/1.0 (housing file)",
+      },
       signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) return [];
@@ -64,8 +67,14 @@ export const crawlBuilding = action({
       ),
       firecrawlScrape(COOK.legalAidUrl),
     ]);
+    let violations = open;
+    if (violations.length === 0) {
+      violations = await soda<Record<string, string>>(
+        `${COOK.violationsApi}?$limit=8&$order=violation_date DESC&$where=${anyWhere}`,
+      );
+    }
     const crawled: Crawled[] = [];
-    for (const v of open) {
+    for (const v of violations) {
       crawled.push({
         agency: "Chicago Buildings",
         kind: "violation",

@@ -5,11 +5,11 @@ import { addDaysIso, COOK, nextStatus, todayIso } from "./lib";
 
 export const approveSend = action({
   args: { userId: v.string(), messageId: v.id("messages") },
-  handler: async (ctx, { userId, messageId }) => {
+  handler: async (ctx, { userId, messageId }): Promise<string> => {
     const msg = await ctx.runQuery(api.mail.getMessage, { messageId });
     if (!msg) throw new Error("Message not found");
     const file = await ctx.runQuery(api.files.get, { userId, fileId: msg.fileId });
-    let via = file.file.mailProvider || "mailto";
+    let via: string = file.file.mailProvider || "mailto";
     const key = process.env.AGENTMAIL_API_KEY;
     if (key && file.file.mailInboxId && msg.toEmail) {
       const res = await fetch(
