@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { UserButton } from "@/lib/auth/gates";
 import { FILE_STEPS, type FileStep } from "@/lib/open-address/flow";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
+import { FolioMark } from "@/components/marks";
 
 export function AppHeader({
   subtitle,
@@ -14,10 +15,15 @@ export function AppHeader({
   title: string;
 }) {
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
-      <Link to="/" className="min-w-0">
-        <p className="text-xs uppercase tracking-widest text-stamp">{subtitle}</p>
-        <h1 className="truncate font-serif text-2xl leading-none">{title}</h1>
+    <header className="flex items-center justify-between gap-3 border-b border-rule bg-paper px-4 py-3">
+      <Link to="/" className="flex min-w-0 items-center gap-2.5 text-ink">
+        <FolioMark className="shrink-0 text-stamp" size={26} />
+        <span className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-stamp">
+            {subtitle}
+          </p>
+          <h1 className="truncate font-serif text-[1.35rem] leading-none">{title}</h1>
+        </span>
       </Link>
       <FolioAccount />
     </header>
@@ -30,32 +36,16 @@ function FolioAccount() {
   if (session.kind === "auth") return <UserButton />;
   return (
     <div className="flex items-center gap-2">
-      <span className="grid h-8 w-8 place-items-center rounded-full bg-black/10 text-sm font-medium">
+      <span className="grid h-8 w-8 place-items-center border border-rule bg-panel font-serif text-sm">
         {session.name.charAt(0).toUpperCase()}
       </span>
       <button
         type="button"
         onClick={signOutGuest}
-        className="text-sm underline-offset-4 opacity-70 hover:underline"
+        className="text-xs text-muted underline-offset-4 hover:underline"
       >
         Sign out
       </button>
-    </div>
-  );
-}
-
-export function DeadlineBar({
-  copy,
-  detail,
-}: {
-  copy: string | null;
-  detail?: string | null;
-}) {
-  if (!copy) return null;
-  return (
-    <div className="border-b border-stamp bg-panel px-4 py-2 text-sm text-stamp">
-      <span className="font-medium">{copy}</span>
-      {detail ? <span className="text-muted"> · {detail}</span> : null}
     </div>
   );
 }
@@ -67,44 +57,43 @@ export function StepRail({
   fileId?: string;
   step: FileStep | "open";
 }) {
+  const tabs: { id: FileStep | "open"; label: string; toHome?: boolean }[] = [
+    { id: "open", label: "Files", toHome: true },
+    ...FILE_STEPS.map((s) => ({ id: s.id, label: s.label })),
+  ];
   return (
     <nav
-      aria-label="File steps"
-      className="grid grid-cols-4 border-b border-rule bg-panel text-center text-xs"
+      aria-label="File"
+      className="grid grid-cols-4 border-b border-rule bg-paper text-center text-xs"
     >
-      <Link
-        to="/"
-        activeOptions={{ exact: true }}
-        className={`min-h-11 px-1 py-3 ${
-          step === "open" ? "bg-ink text-paper" : "text-muted"
-        }`}
-      >
-        <span className="block font-medium">1</span>
-        Open
-      </Link>
-      {FILE_STEPS.map((s) => {
-        const active = step === s.id;
-        const disabled = !fileId;
-        if (disabled) {
+      {tabs.map((t) => {
+        const active = step === t.id;
+        const cls = `min-h-11 px-1 py-3 tracking-wide ${
+          active ? "border-b-2 border-ink font-medium text-ink" : "text-muted"
+        }`;
+        if (t.toHome) {
           return (
-            <span key={s.id} className="min-h-11 px-1 py-3 text-rule">
-              <span className="block font-medium">{s.n}</span>
-              {s.label}
+            <Link key={t.id} to="/" activeOptions={{ exact: true }} className={cls}>
+              {t.label}
+            </Link>
+          );
+        }
+        if (!fileId) {
+          return (
+            <span key={t.id} className="min-h-11 px-1 py-3 text-rule">
+              {t.label}
             </span>
           );
         }
         return (
           <Link
-            key={s.id}
+            key={t.id}
             to="/file/$fileId"
             params={{ fileId }}
-            search={{ step: s.id }}
-            className={`min-h-11 px-1 py-3 ${
-              active ? "bg-ink text-paper" : "text-muted"
-            }`}
+            search={{ step: t.id as FileStep }}
+            className={cls}
           >
-            <span className="block font-medium">{s.n}</span>
-            {s.label}
+            {t.label}
           </Link>
         );
       })}
@@ -121,7 +110,9 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs uppercase tracking-widest text-muted">{label}</span>
+      <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
+        {label}
+      </span>
       {children}
     </label>
   );

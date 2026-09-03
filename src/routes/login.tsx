@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 import { saveGuest } from "@/lib/open-address/folio-user";
+import { FolioMark } from "@/components/marks";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -20,7 +21,7 @@ function Login() {
     setBusy(true);
     setErr(null);
     try {
-      if (!email.includes("@")) throw new Error("Enter a real email");
+      if (!email.includes("@")) throw new Error("Enter the email you actually use");
       saveGuest({ email, name: name || email.split("@")[0] });
       await navigate({ to: "/" });
     } catch (e) {
@@ -52,15 +53,19 @@ function Login() {
   }
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-12 text-ink">
+    <main className="min-h-screen bg-paper px-4 py-14 text-ink">
       <div className="mx-auto w-full max-w-sm">
-        <p className="text-xs uppercase tracking-widest text-stamp">
+        <FolioMark className="text-stamp" size={36} />
+        <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-stamp">
           Cook County
         </p>
-        <h1 className="mt-2 font-serif text-4xl">Folio</h1>
+        <h1 className="mt-1 font-serif text-5xl leading-none">Folio</h1>
+        <p className="mt-4 text-[1.05rem] leading-snug text-ink">
+          The city’s file. Their date. Your clock.
+        </p>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          One file for the notice on your door, the city’s records, and the
-          letter you actually send.
+          They posted a notice. Chicago may already have the building on a list.
+          If they name a Friday, that Friday is a claim.
         </p>
         <form
           className="mt-8 space-y-3"
@@ -71,26 +76,25 @@ function Login() {
           }}
         >
           <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-widest text-muted">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
               Email
             </span>
             <input
-              className="w-full min-h-11 rounded-sm border border-rule bg-panel px-3 text-sm"
+              className="folio-input"
               type="email"
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com"
               required
             />
           </label>
           {!onVercel ? (
             <label className="block space-y-1">
-              <span className="text-xs uppercase tracking-widest text-muted">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
                 Password
               </span>
               <input
-                className="w-full min-h-11 rounded-sm border border-rule bg-panel px-3 text-sm"
+                className="folio-input"
                 type="password"
                 autoComplete="current-password"
                 value={password}
@@ -100,58 +104,57 @@ function Login() {
             </label>
           ) : null}
           <label className="block space-y-1">
-            <span className="text-xs uppercase tracking-widest text-muted">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
               Name
             </span>
             <input
-              className="w-full min-h-11 rounded-sm border border-rule bg-panel px-3 text-sm"
+              className="folio-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="For a new account"
               autoComplete="name"
             />
           </label>
           {err ? <p className="text-sm text-stamp">{err}</p> : null}
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full min-h-11 rounded-sm bg-ink text-sm text-paper"
-          >
-            {busy ? "Working…" : onVercel ? "Continue" : "Sign in"}
+          <button type="submit" disabled={busy} className="folio-btn">
+            {busy ? "Opening…" : onVercel ? "Open my files" : "Sign in"}
           </button>
           {!onVercel ? (
             <button
               type="button"
               disabled={busy}
               onClick={() => void submit("up")}
-              className="w-full min-h-11 rounded-sm border border-ink text-sm"
+              className="folio-btn-ghost w-full"
             >
               Create account
             </button>
           ) : null}
         </form>
         <div className="mt-4 space-y-2">
-          {authEnabled && !onVercel && host ? (
-            GROK_PROVIDERS.map((p) => (
-              <button
-                key={p.providerId}
-                type="button"
-                onClick={() => signIn(p.providerId, { callbackURL: "/" })}
-                className="w-full min-h-11 rounded-sm border border-rule bg-panel px-4 text-sm"
-              >
-                Continue with {p.label}
-              </button>
-            ))
-          ) : onVercel ? (
-            <p className="text-sm text-muted">
-              Enter the email you’ll use for this file. No password on this
-              link.
-            </p>
-          ) : !authEnabled ? (
-            <p className="text-sm text-muted">Sign-in is disabled.</p>
-          ) : null}
+          {authEnabled && !onVercel && host
+            ? GROK_PROVIDERS.map((p) => (
+                <button
+                  key={p.providerId}
+                  type="button"
+                  onClick={() => signIn(p.providerId, { callbackURL: "/" })}
+                  className="folio-btn-ghost w-full"
+                >
+                  Continue with {p.label}
+                </button>
+              ))
+            : onVercel
+              ? (
+                <p className="text-sm text-muted">
+                  Use the email you’ll put on the letter. No password on this
+                  link.
+                </p>
+                )
+              : !authEnabled
+                ? (
+                  <p className="text-sm text-muted">Sign-in is disabled.</p>
+                  )
+                : null}
         </div>
-        <p className="mt-8 text-xs text-muted">
+        <p className="mt-10 text-xs leading-relaxed text-muted">
           Not a lawyer. Does not file in court.
         </p>
       </div>

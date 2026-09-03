@@ -12,9 +12,9 @@
   --color-stamp: #8e2b2b;
   --color-filed: #2c5a4a;
   --color-chip: #e7dcc6;
-  --radius-sm: 0.25rem;
-  --radius-lg: 0.75rem;
-  --radius: 0.25rem;
+  --radius-sm: 0.125rem;
+  --radius-lg: 0.125rem;
+  --radius: 0.125rem;
 }
 
 @layer base {
@@ -41,6 +41,63 @@
   }
   p {
     text-wrap: pretty;
+  }
+  input,
+  textarea {
+    border-radius: 0.125rem;
+  }
+}
+
+@layer components {
+  .folio-input {
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid var(--color-rule);
+    background: var(--color-paper);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+  }
+  .folio-input:focus {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 1px;
+  }
+  .folio-btn {
+    display: inline-flex;
+    min-height: 2.75rem;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-ink);
+    padding: 0 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-paper);
+  }
+  .folio-btn:disabled {
+    opacity: 0.4;
+  }
+  .folio-btn-ghost {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-ink);
+    padding: 0 0.9rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    background: transparent;
+  }
+  .folio-btn-stamp {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-stamp);
+    padding: 0 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-paper);
   }
 }
 

@@ -3,24 +3,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import {
-  listFiles,
-  loadSample,
-  openFile,
-} from "@/lib/open-address/data";
+import { getFile, listFiles, loadSample, openFile } from "@/lib/open-address/data";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
-  recommendedStep,
-  statusLabel,
+  casePulse,
+  recommendedStepFromPulse,
+  type CasePulse,
 } from "@/lib/open-address/flow";
 import type { AddressFile } from "@/lib/open-address/types";
-import { AppHeader, Field, StepRail } from "@/components/app-shell";
+import { AppHeader, Field } from "@/components/app-shell";
+import { FolioMark } from "@/components/marks";
+
+type Card = { file: AddressFile; pulse: CasePulse };
 
 export function HomeFiles() {
   const { session, isPending } = useFolioSession();
   if (isPending) {
-    return <div className="min-h-screen bg-paper p-6 text-muted">Loading…</div>;
+    return <div className="min-h-screen bg-paper p-6 text-muted">Opening…</div>;
   }
   if (!session) return <RedirectToSignIn />;
   return <HomeShell userId={session.userId} name={session.name} />;
@@ -28,19 +28,26 @@ export function HomeFiles() {
 
 function HomeShell({ userId, name }: { userId: string; name: string }) {
   const navigate = useNavigate();
-  const [files, setFiles] = useState<AddressFile[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openForm, setOpenForm] = useState(false);
   const [street, setStreet] = useState("");
   const [unit, setUnit] = useState("");
   const [zip, setZip] = useState("");
   const [tenantName, setTenantName] = useState(name);
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
-  const [clinicEmail, setClinicEmail] = useState("");
 
   const refresh = useCallback(async () => {
-    setFiles(await listFiles(userId));
+    const files = await listFiles(userId);
+    const next = await Promise.all(
+      files.map(async (file) => {
+        const bundle = await getFile(userId, file.id);
+        return { file, pulse: casePulse(bundle) };
+      }),
+    );
+    setCards(next);
   }, [userId]);
 
   useEffect(() => {
@@ -55,7 +62,7 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      setError(err instanceof Error ? err.message : "That did not save");
     } finally {
       setBusy(null);
     }
@@ -64,153 +71,187 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
   return (
     <div className="min-h-screen bg-paper text-ink">
       <AppHeader subtitle="Cook County" title="Folio" />
-      <StepRail step="open" />
-      <main className="mx-auto max-w-lg space-y-6 px-4 py-6">
-        <h2 className="font-serif text-2xl">Your apartment, one file</h2>
+      <main className="mx-auto max-w-lg px-4 py-8">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-stamp">
+          Cook County · City of Chicago
+        </p>
+        <h2 className="mt-2 font-serif text-[2rem] leading-[1.15]">
+          The city’s file. Their date. Your clock.
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          The notice on the door, what Chicago already wrote about the building,
+          and the day they named — in one file you can hand to legal aid.
+        </p>
+
         {error ? (
-          <p className="border border-stamp bg-panel px-3 py-2 text-sm text-stamp">
+          <p className="mt-4 border border-stamp bg-panel px-3 py-2 text-sm text-stamp">
             {error}
           </p>
         ) : null}
 
-        {files.length ? (
-          <section>
-            <h3 className="text-xs uppercase tracking-widest text-muted">
-              Open files
-            </h3>
-            <ul className="mt-2 divide-y divide-rule border border-rule">
-              {files.map((f) => (
-                <li key={f.id}>
-                  <Link
-                    to="/file/$fileId"
-                    params={{ fileId: f.id }}
-                    search={{ step: recommendedStep(f.status) }}
-                    className="flex min-h-14 items-center justify-between px-3 py-3"
+        {cards.length ? (
+          <ul className="mt-8 divide-y divide-rule border border-rule bg-panel">
+            {cards.map(({ file, pulse }) => (
+              <li key={file.id}>
+                <Link
+                  to="/file/$fileId"
+                  params={{ fileId: file.id }}
+                  search={{ step: recommendedStepFromPulse(pulse) }}
+                  className="flex min-h-16 items-stretch gap-3"
+                >
+                  <span
+                    className={`flex w-16 shrink-0 flex-col items-center justify-center ${
+                      pulse.days != null && pulse.days <= 2
+                        ? "bg-stamp text-paper"
+                        : "bg-chip text-ink"
+                    }`}
                   >
-                    <span className="font-medium">{addressLabel(f)}</span>
-                    <span className="text-sm text-muted">
-                      {statusLabel(f.status)}
+                    <span className="font-serif text-2xl leading-none tabular-nums">
+                      {pulse.days != null ? Math.abs(pulse.days) : "—"}
                     </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+                    <span className="text-[9px] uppercase tracking-wider">
+                      {pulse.days == null
+                        ? "days"
+                        : pulse.days < 0
+                          ? "late"
+                          : "left"}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col justify-center py-3 pr-3">
+                    <span className="truncate font-medium">
+                      {addressLabel(file)}
+                    </span>
+                    <span className="truncate text-xs text-muted">
+                      {pulse.headline}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mt-8 border border-rule bg-panel px-4 py-5">
+            <FolioMark className="text-stamp" size={28} />
+            <p className="mt-3 font-serif text-xl">No file yet.</p>
+            <p className="mt-1 text-sm text-muted">
+              Start with the street. Or open a real Chicago building and see how
+              the city already listed it.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-8 space-y-3">
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() =>
+              void run("seed", async () => {
+                const f = await loadSample(userId);
+                await navigate({
+                  to: "/file/$fileId",
+                  params: { fileId: f.id },
+                  search: { step: "notice" },
+                });
+              })
+            }
+            className="folio-btn"
+          >
+            {busy === "seed" ? "Opening…" : "Open 1757 W Berteau — a real building"}
+          </button>
+          <button
+            type="button"
+            className="folio-btn-ghost w-full"
+            onClick={() => setOpenForm((v) => !v)}
+          >
+            {openForm ? "Hide the form" : "Start a file on my street"}
+          </button>
+        </div>
+
+        {openForm ? (
+          <form
+            className="mt-6 space-y-3 border border-rule bg-panel p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run("create", async () => {
+                const f = await openFile(userId, {
+                  street,
+                  unit,
+                  city: "Chicago",
+                  state: "IL",
+                  zip,
+                  tenantName,
+                  ownerName,
+                  ownerEmail,
+                });
+                await navigate({
+                  to: "/file/$fileId",
+                  params: { fileId: f.id },
+                  search: { step: "notice" },
+                });
+              });
+            }}
+          >
+            <Field label="Street">
+              <input
+                required
+                className="folio-input"
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                placeholder="1757 W Berteau Ave"
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Unit">
+                <input
+                  className="folio-input"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  placeholder="2F"
+                />
+              </Field>
+              <Field label="ZIP">
+                <input
+                  className="folio-input"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  placeholder="60613"
+                  inputMode="numeric"
+                />
+              </Field>
+            </div>
+            <Field label="Your name">
+              <input
+                className="folio-input"
+                value={tenantName}
+                onChange={(e) => setTenantName(e.target.value)}
+              />
+            </Field>
+            <Field label="Landlord / LLC">
+              <input
+                className="folio-input"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+              />
+            </Field>
+            <Field label="Landlord email">
+              <input
+                type="email"
+                className="folio-input"
+                value={ownerEmail}
+                onChange={(e) => setOwnerEmail(e.target.value)}
+              />
+            </Field>
+            <button
+              type="submit"
+              disabled={busy !== null}
+              className="folio-btn"
+            >
+              {busy === "create" ? "Opening…" : "Open this file"}
+            </button>
+          </form>
         ) : null}
 
-        <form
-          className="space-y-3 rounded-lg border border-rule bg-panel p-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run("create", async () => {
-              const f = await openFile(userId, {
-                street,
-                unit,
-                city: "Chicago",
-                state: "IL",
-                zip,
-                tenantName,
-                ownerName,
-                ownerEmail,
-                clinicEmail,
-              });
-              await navigate({
-                to: "/file/$fileId",
-                params: { fileId: f.id },
-                search: { step: "notice" },
-              });
-            });
-          }}
-        >
-          <h3 className="font-serif text-xl">Open a file</h3>
-          <Field label="Street">
-            <input
-              required
-              className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-              value={street}
-              onChange={(e) => setStreet(e.target.value)}
-              placeholder="1757 W Berteau Ave"
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Unit">
-              <input
-                className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="2F"
-              />
-            </Field>
-            <Field label="ZIP">
-              <input
-                className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                placeholder="60613"
-                inputMode="numeric"
-              />
-            </Field>
-          </div>
-          <Field label="Your name">
-            <input
-              className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
-            />
-          </Field>
-          <Field label="Landlord / LLC">
-            <input
-              className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="Who is on the lease"
-            />
-          </Field>
-          <Field label="Landlord email">
-            <input
-              type="email"
-              className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-              value={ownerEmail}
-              onChange={(e) => setOwnerEmail(e.target.value)}
-              placeholder="Where the demand should go"
-            />
-          </Field>
-          <Field label="Legal aid email">
-            <input
-              type="email"
-              className="w-full min-h-11 rounded-sm border border-rule bg-paper px-3 text-sm"
-              value={clinicEmail}
-              onChange={(e) => setClinicEmail(e.target.value)}
-              placeholder="Optional"
-            />
-          </Field>
-          <button
-            type="submit"
-            disabled={busy !== null}
-            className="w-full min-h-11 rounded-sm bg-ink text-sm text-paper"
-          >
-            {busy === "create" ? "Opening…" : "Open my file"}
-          </button>
-        </form>
-
-        <button
-          type="button"
-          disabled={busy !== null}
-          onClick={() =>
-            void run("seed", async () => {
-              const f = await loadSample(userId);
-              await navigate({
-                to: "/file/$fileId",
-                params: { fileId: f.id },
-                search: { step: "notice" },
-              });
-            })
-          }
-          className="text-sm text-muted underline"
-        >
-          {busy === "seed" ? "Loading sample…" : "Load a public Cook County sample"}
-        </button>
-        <p className="text-xs text-muted">
+        <p className="mt-8 text-xs leading-relaxed text-muted">
           Not a lawyer. Does not file in court. Cook County first.
         </p>
       </main>

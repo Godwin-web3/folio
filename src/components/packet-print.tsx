@@ -30,10 +30,10 @@ export function PacketPrint({ fileId }: { fileId: string }) {
 
   return (
     <article className="mx-auto max-w-2xl p-6 print:p-0">
-      <p className="text-xs uppercase tracking-[0.25em] text-stamp">
-        Folio packet
+      <p className="text-[10px] uppercase tracking-[0.25em] text-stamp">
+        Cook County · Folio packet
       </p>
-      <h1 className="mt-2 font-serif text-3xl">{address}</h1>
+      <h1 className="mt-2 font-serif text-3xl leading-tight">{address}</h1>
       <p className="mt-2 text-sm text-muted">
         Assembled {new Date().toISOString().slice(0, 10)}. Not legal advice. Do
         not file this as a court form unless a lawyer or self-help desk tells

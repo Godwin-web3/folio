@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "One file per apartment: the notice, the city’s records, and the letter you send.",
+          "The city’s file, the date they named, and the notice on your door — one Cook County file.",
       },
       { name: "theme-color", content: "#efe6d3" },
     ],
