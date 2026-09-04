@@ -126,8 +126,12 @@
   .print\:hidden {
     display: none !important;
   }
-  body {
+  body,
+  #root {
     background: white;
     color: black;
+  }
+  .packet {
+    box-shadow: none;
   }
 }

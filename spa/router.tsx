@@ -7,6 +7,7 @@ import { Landing } from "@/components/landing";
 import { HomeFiles } from "@/components/home-files";
 import { FileWorkspace } from "@/components/file-workspace";
 import { PacketPrint } from "@/components/packet-print";
+import { WatchFile } from "@/components/watch-file";
 import { Login } from "@/routes/login";
 import { parseFileStep } from "@/lib/open-address/flow";
 
@@ -50,12 +51,22 @@ const packetRoute = createRoute({
   },
 });
 
+const watchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/watch/$watchKey",
+  component: function WatchPage() {
+    const { watchKey } = watchRoute.useParams();
+    return <WatchFile watchKey={watchKey} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   filesRoute,
   loginRoute,
   fileRoute,
   packetRoute,
+  watchRoute,
 ]);
 
 export function getRouter() {

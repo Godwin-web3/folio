@@ -23,6 +23,7 @@ export type AddressFile = {
   case_inbox: string;
   mail_inbox_id: string | null;
   mail_provider: string;
+  watch_key: string | null;
   created_at: string;
   updated_at: string;
 };

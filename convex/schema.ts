@@ -15,11 +15,13 @@ export default defineSchema({
     caseInbox: v.string(),
     mailInboxId: v.optional(v.string()),
     mailProvider: v.string(),
+    watchKey: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_inbox", ["caseInbox"])
     .index("by_mail_inbox", ["mailInboxId"])
-    .index("by_user_demo", ["userId", "demoKey"]),
+    .index("by_user_demo", ["userId", "demoKey"])
+    .index("by_watch", ["watchKey"]),
 
   fileMembers: defineTable({
     fileId: v.id("addressFiles"),

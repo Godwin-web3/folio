@@ -19,11 +19,11 @@ Everyday app: a Cook County tenant keeps one folio. The city’s building file, 
 ## Demo (three minutes)
 
 1. Open https://efficient-raccoon-976.convex.site — email, continue.
-2. Tap **Open 1757 W Berteau — notice + Chicago**. Notice is filed. City list is pulled live.
-3. Top of the file: clock, Chicago count, promise.
-4. Draft the letter. Send it.
-5. Tap **They said Friday — stamp it**. That date becomes a claim on the face.
-6. Build the packet.
+2. Photograph the paper on the door (OpenAI/xAI vision) or open 1757 W Berteau.
+3. Pull Chicago — live open violations.
+4. Copy the **watch link**. Second phone opens `/watch/…` and stays live.
+5. Stamp Friday. Legal aid sees it without refresh.
+6. Print Exhibit A / B / C. The judge will not look it up.
 
 Not a lawyer. Does not e-file. Cook County first.
 

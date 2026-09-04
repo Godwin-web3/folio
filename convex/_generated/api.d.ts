@@ -18,6 +18,7 @@ import type * as letters from "../letters.js";
 import type * as lib from "../lib.js";
 import type * as mail from "../mail.js";
 import type * as open from "../open.js";
+import type * as photo from "../photo.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   lib: typeof lib;
   mail: typeof mail;
   open: typeof open;
+  photo: typeof photo;
 }>;
 
 /**

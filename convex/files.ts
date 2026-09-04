@@ -2,6 +2,38 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { caseInbox, COOK, nextStatus, todayIso } from "./lib";
 
+function newWatchKey() {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+async function bundleOf(ctx: { db: any }, file: any) {
+  const fileId = file._id;
+  const [parties, notices, records, issues, claims, messages, exhibits, deadlines, events] =
+    await Promise.all([
+      ctx.db.query("parties").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("notices").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("records").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("issues").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("claims").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("messages").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("exhibits").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("deadlines").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("timelineEvents").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+    ]);
+  return {
+    file,
+    parties,
+    notices,
+    records,
+    issues,
+    claims,
+    messages,
+    exhibits,
+    deadlines,
+    events,
+  };
+}
+
 async function requireFile(
   ctx: { db: any },
   fileId: any,
@@ -45,30 +77,30 @@ export const get = query({
   args: { userId: v.string(), fileId: v.id("addressFiles") },
   handler: async (ctx, { userId, fileId }) => {
     const file = await requireFile(ctx, fileId, userId);
-    const [parties, notices, records, issues, claims, messages, exhibits, deadlines, events] =
-      await Promise.all([
-        ctx.db.query("parties").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("notices").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("records").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("issues").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("claims").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("messages").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("exhibits").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("deadlines").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-        ctx.db.query("timelineEvents").withIndex("by_file", (q) => q.eq("fileId", fileId)).collect(),
-      ]);
-    return {
-      file,
-      parties,
-      notices,
-      records,
-      issues,
-      claims,
-      messages,
-      exhibits,
-      deadlines,
-      events,
-    };
+    return bundleOf(ctx, file);
+  },
+});
+
+export const getByWatch = query({
+  args: { watchKey: v.string() },
+  handler: async (ctx, { watchKey }) => {
+    const file = await ctx.db
+      .query("addressFiles")
+      .withIndex("by_watch", (q) => q.eq("watchKey", watchKey))
+      .first();
+    if (!file) return null;
+    return bundleOf(ctx, file);
+  },
+});
+
+export const ensureWatchKey = mutation({
+  args: { userId: v.string(), fileId: v.id("addressFiles") },
+  handler: async (ctx, { userId, fileId }) => {
+    const file = await requireFile(ctx, fileId, userId);
+    if (file.watchKey) return file.watchKey;
+    const watchKey = newWatchKey();
+    await ctx.db.patch(fileId, { watchKey });
+    return watchKey;
   },
 });
 
@@ -133,6 +165,7 @@ export const create = mutation({
       mailInboxId: args.mailInboxId,
       mailProvider: args.mailProvider || "mailto",
       demoKey: args.demoKey,
+      watchKey: newWatchKey(),
     });
     if (args.tenantName.trim()) {
       await ctx.db.insert("parties", {
@@ -186,6 +219,7 @@ export const ingestNotice = mutation({
     amountCents: v.optional(v.number()),
     reason: v.string(),
     rawText: v.string(),
+    source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const file = await requireFile(ctx, args.fileId, args.userId);
@@ -199,7 +233,7 @@ export const ingestNotice = mutation({
       amountCents: args.amountCents,
       reason: args.reason,
       rawText: args.rawText,
-      source: "paste",
+      source: args.source || "paste",
     });
     if (args.deadlineOn) {
       await ctx.db.insert("deadlines", {

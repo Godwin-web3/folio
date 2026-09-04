@@ -96,17 +96,17 @@ export function Landing() {
         <section className="mt-16">
           <h2 className="font-serif text-3xl">Three minutes. One apartment.</h2>
           <ol className="mt-6 space-y-4">
-            <Step n="01" title="Open the street.">
-              Berteau, Lincoln, Peoria — or yours. Folio starts a file, not a
-              chat.
+            <Step n="01" title="Photograph the paper on the door.">
+              Folio reads the deadline. Or open a real Chicago building and
+              start from there.
             </Step>
             <Step n="02" title="Pull Chicago.">
               Inspectors already failed this building. That list goes next to
-              the notice.
+              the notice — printed, because the judge will not look it up.
             </Step>
-            <Step n="03" title="Stamp the date they name.">
-              Draft the letter. Send it. When they say Friday, tap the stamp.
-              Print the packet for legal aid.
+            <Step n="03" title="Legal aid watches live.">
+              Send the letter. Stamp the Friday they name. Share a watch link.
+              Print Exhibit A, B, and C.
             </Step>
           </ol>
         </section>

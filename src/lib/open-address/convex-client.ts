@@ -42,6 +42,7 @@ function asFile(doc: Record<string, unknown>): AddressFile {
     case_inbox: String(doc.caseInbox),
     mail_inbox_id: (doc.mailInboxId as string | undefined) ?? null,
     mail_provider: String(doc.mailProvider ?? "mailto"),
+    watch_key: (doc.watchKey as string | undefined) ?? null,
     created_at: iso(doc._creationTime as number),
     updated_at: iso(doc._creationTime as number),
   };
@@ -223,4 +224,8 @@ export function asFileId(id: string): FileId {
 
 export function asMessageId(id: string): MessageId {
   return id as MessageId;
+}
+
+export function asStorageId(id: string): Id<"_storage"> {
+  return id as Id<"_storage">;
 }

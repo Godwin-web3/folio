@@ -166,32 +166,74 @@ export const assemble = mutation({
     const n = notices[0];
     if (n) {
       pieces.push({
-        title: `Notice — ${n.noticeType.replaceAll("_", " ")}`,
+        title: "Notice posted on the door",
         kind: "notice",
         table: "notices",
         id: n._id,
-        body: n.rawText,
+        body: [
+          `EXHIBIT A — NOTICE`,
+          ``,
+          `Give this page to legal aid. Do not ask the judge to look up a website.`,
+          ``,
+          `Type: ${n.noticeType.replaceAll("_", " ")}`,
+          `Served: ${n.servedOn ?? "not stated"}`,
+          `Deadline: ${n.deadlineOn ?? "not stated"}`,
+          `From: ${n.plaintiff || "not stated"}`,
+          n.amountCents
+            ? `Amount claimed: $${(n.amountCents / 100).toFixed(2)}`
+            : "",
+          `Source: ${n.source}`,
+          ``,
+          `— Transcription —`,
+          n.rawText,
+        ]
+          .filter(Boolean)
+          .join("\n"),
       });
     }
     const viol = records.filter((r) => r.kind === "violation");
     if (viol[0]) {
       pieces.push({
-        title: "City building violations",
+        title: "City of Chicago open building violations",
         kind: "records",
         table: "records",
         id: viol[0]._id,
-        body: viol.map((v) => `${v.title}\n${v.rawExcerpt}\n${v.url}`).join("\n\n"),
+        body: [
+          `EXHIBIT B — CITY OF CHICAGO BUILDING VIOLATIONS`,
+          ``,
+          `Pulled from the City of Chicago Building Violations dataset.`,
+          `Judges will not open this website for you. Print this page.`,
+          `Source: ${COOK.buildingsUrl}`,
+          ``,
+          ...viol.map(
+            (v, i) =>
+              `${String(i + 1).padStart(2, "0")}. ${v.title}\n    ${v.rawExcerpt || v.extracted}`,
+          ),
+        ].join("\n"),
       });
     }
     const inbound = messages.find((m) => m.direction === "inbound");
     const promise = claims.find((c) => c.kind === "promise");
-    if (inbound) {
+    if (inbound || promise) {
       pieces.push({
-        title: promise ? `Dated promise — due ${promise.dueOn}` : "Landlord reply",
+        title: promise
+          ? `Dated promise — ${promise.dueOn}`
+          : "Landlord reply",
         kind: "promise",
-        table: "messages",
-        id: inbound._id,
-        body: inbound.body,
+        table: promise ? "claims" : "messages",
+        id: promise?._id ?? inbound?._id ?? file._id,
+        body: [
+          `EXHIBIT C — DATED PROMISE`,
+          ``,
+          promise
+            ? `They named a day: ${promise.dueOn}. That day is in this file.`
+            : `Landlord reply, no dated commitment extracted.`,
+          ``,
+          inbound ? `From: ${inbound.fromEmail}` : "",
+          inbound ? inbound.body : promise?.description ?? "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
       });
     }
     const help = records.find((r) => r.kind === "self_help");

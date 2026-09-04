@@ -4,8 +4,10 @@ import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { api, asFileId, asMessageId, mapBundle } from "@/lib/open-address/convex-client";
+import { api, asFileId, asMessageId, asStorageId, mapBundle } from "@/lib/open-address/convex-client";
 import { ingestNotice, logReply } from "@/lib/open-address/data";
+import { compressNoticePhoto } from "@/lib/open-address/compress-image";
+import { watchHref } from "@/lib/open-address/watch-url";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
@@ -53,6 +55,9 @@ function FileShell({
   const send = useAction(api.mail.approveSend);
   const pack = useMutation(api.letters.assemble);
   const friday = useAction(api.mail.stampFriday);
+  const uploadUrl = useMutation(api.photo.generateUploadUrl);
+  const parsePhoto = useAction(api.photo.parseNoticePhoto);
+  const ensureWatch = useMutation(api.files.ensureWatchKey);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noticeText, setNoticeText] = useState("");
@@ -103,6 +108,24 @@ function FileShell({
               void run("notice", async () => {
                 await ingestNotice(userId, fileId, noticeText);
                 setNoticeText("");
+              })
+            }
+            onPhoto={(file) =>
+              void run("photo", async () => {
+                const blob = await compressNoticePhoto(file);
+                const url = await uploadUrl({});
+                const posted = await fetch(url, {
+                  method: "POST",
+                  headers: { "Content-Type": blob.type || "image/jpeg" },
+                  body: blob,
+                });
+                if (!posted.ok) throw new Error("Photo did not upload");
+                const { storageId } = (await posted.json()) as { storageId: string };
+                await parsePhoto({
+                  userId,
+                  fileId: asFileId(fileId),
+                  storageId: asStorageId(storageId),
+                });
               })
             }
             onCrawl={() =>
@@ -174,6 +197,15 @@ function FileShell({
                 await pack({ userId, fileId: asFileId(fileId) });
               })
             }
+            onWatch={async () => {
+              const key = await ensureWatch({
+                userId,
+                fileId: asFileId(fileId),
+              });
+              const href = watchHref(key);
+              await copyText(href);
+              return href;
+            }}
           />
         ) : null}
       </main>
@@ -187,6 +219,7 @@ function NoticeScreen({
   noticeText,
   setNoticeText,
   onIngest,
+  onPhoto,
   onCrawl,
   onNext,
 }: {
@@ -195,6 +228,7 @@ function NoticeScreen({
   noticeText: string;
   setNoticeText: (v: string) => void;
   onIngest: () => void;
+  onPhoto: (file: File) => void;
   onCrawl: () => void;
   onNext: () => void;
 }) {
@@ -222,6 +256,22 @@ function NoticeScreen({
           </div>
         ) : (
           <>
+            <label className="folio-btn cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                disabled={busy !== null}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onPhoto(file);
+                  e.target.value = "";
+                }}
+              />
+              {busy === "photo" ? "Reading the paper…" : "Photograph the paper on the door"}
+            </label>
+            <p className="text-center text-xs text-muted">or paste the words</p>
             <textarea
               className="folio-input min-h-40 font-serif"
               value={noticeText}
@@ -452,20 +502,36 @@ function PacketScreen({
   bundle,
   busy,
   onPacket,
+  onWatch,
 }: {
   bundle: FileBundle;
   busy: string | null;
   onPacket: () => void;
+  onWatch: () => Promise<string>;
 }) {
+  const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-6">
       <section>
         <h3 className="font-serif text-xl">What you can hand someone</h3>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Notice, Chicago’s list, the letter, and any dated promise — labeled as
-          exhibits. Not a court form.
+          Exhibit A the notice. Exhibit B Chicago’s list. Exhibit C the day they
+          named. Print copies. Legal aid watches the live file.
         </p>
       </section>
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={() =>
+          void onWatch().then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+          })
+        }
+        className="folio-btn-ghost w-full"
+      >
+        {copied ? "Watch link copied" : "Copy watch link for legal aid"}
+      </button>
       {bundle.exhibits.length === 0 ? (
         <button
           type="button"

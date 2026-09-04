@@ -14,6 +14,7 @@ import { Route as FilesRouteImport } from './routes/files'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FileFileIdRouteImport } from './routes/file.$fileId'
 import { Route as PacketFileIdRouteImport } from './routes/packet.$fileId'
+import { Route as WatchWatchKeyRouteImport } from './routes/watch.$watchKey'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMailWebhookRouteImport } from './routes/api/mail/webhook'
 
@@ -42,6 +43,11 @@ const PacketFileIdRoute = PacketFileIdRouteImport.update({
   path: '/packet/$fileId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WatchWatchKeyRoute = WatchWatchKeyRouteImport.update({
+  id: '/watch/$watchKey',
+  path: '/watch/$watchKey',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/file/$fileId': typeof FileFileIdRoute
   '/packet/$fileId': typeof PacketFileIdRoute
+  '/watch/$watchKey': typeof WatchWatchKeyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mail/webhook': typeof ApiMailWebhookRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/file/$fileId': typeof FileFileIdRoute
   '/packet/$fileId': typeof PacketFileIdRoute
+  '/watch/$watchKey': typeof WatchWatchKeyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mail/webhook': typeof ApiMailWebhookRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/file/$fileId': typeof FileFileIdRoute
   '/packet/$fileId': typeof PacketFileIdRoute
+  '/watch/$watchKey': typeof WatchWatchKeyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mail/webhook': typeof ApiMailWebhookRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/file/$fileId'
     | '/packet/$fileId'
+    | '/watch/$watchKey'
     | '/api/auth/$'
     | '/api/mail/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/file/$fileId'
     | '/packet/$fileId'
+    | '/watch/$watchKey'
     | '/api/auth/$'
     | '/api/mail/webhook'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/file/$fileId'
     | '/packet/$fileId'
+    | '/watch/$watchKey'
     | '/api/auth/$'
     | '/api/mail/webhook'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   FileFileIdRoute: typeof FileFileIdRoute
   PacketFileIdRoute: typeof PacketFileIdRoute
+  WatchWatchKeyRoute: typeof WatchWatchKeyRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMailWebhookRoute: typeof ApiMailWebhookRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PacketFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/watch/$watchKey': {
+      id: '/watch/$watchKey'
+      path: '/watch/$watchKey'
+      fullPath: '/watch/$watchKey'
+      preLoaderRoute: typeof WatchWatchKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   FileFileIdRoute: FileFileIdRoute,
   PacketFileIdRoute: PacketFileIdRoute,
+  WatchWatchKeyRoute: WatchWatchKeyRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMailWebhookRoute: ApiMailWebhookRoute,
 }
