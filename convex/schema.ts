@@ -18,6 +18,8 @@ export default defineSchema({
     mailInboxId: v.optional(v.string()),
     mailProvider: v.string(),
     watchKey: v.optional(v.string()),
+    courtCaseNumber: v.optional(v.string()),
+    jurisdictionLabel: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_inbox", ["caseInbox"])
@@ -26,14 +28,16 @@ export default defineSchema({
     .index("by_watch", ["watchKey"])
     .searchIndex("search_street", {
       searchField: "street",
-      filterFields: ["userId"]
+      filterFields: ["userId"],
     }),
 
   fileMembers: defineTable({
     fileId: v.id("addressFiles"),
     userId: v.string(),
     role: v.string(),
-  }).index("by_file", ["fileId"]).index("by_user", ["userId"]),
+  })
+    .index("by_file", ["fileId"])
+    .index("by_user", ["userId"]),
 
   parties: defineTable({
     fileId: v.id("addressFiles"),
@@ -55,6 +59,10 @@ export default defineSchema({
     reason: v.string(),
     rawText: v.string(),
     source: v.string(),
+    storageId: v.optional(v.id("_storage")),
+    servedPhotoStorageId: v.optional(v.id("_storage")),
+    servedAt: v.optional(v.number()),
+    servedMethod: v.optional(v.string()),
   }).index("by_file", ["fileId"]),
 
   records: defineTable({
@@ -115,6 +123,7 @@ export default defineSchema({
     sourceTable: v.string(),
     sourceId: v.string(),
     body: v.string(),
+    storageId: v.optional(v.id("_storage")),
   }).index("by_file", ["fileId"]),
 
   deadlines: defineTable({
@@ -133,4 +142,37 @@ export default defineSchema({
     title: v.string(),
     detail: v.string(),
   }).index("by_file", ["fileId"]),
+
+  ledgerEntries: defineTable({
+    fileId: v.id("addressFiles"),
+    userId: v.string(),
+    kind: v.string(), // charge | payment | adjustment | notice
+    amountCents: v.number(),
+    note: v.string(),
+    occurredOn: v.string(), // YYYY-MM-DD
+    relatedNoticeId: v.optional(v.id("notices")),
+  }).index("by_file", ["fileId"]),
+
+  checklistItems: defineTable({
+    fileId: v.id("addressFiles"),
+    userId: v.string(),
+    code: v.string(),
+    title: v.string(),
+    detail: v.string(),
+    status: v.string(), // open | flagged | cleared | na
+    source: v.string(), // rlto | habitability | custom
+  }).index("by_file", ["fileId"]),
+
+  reminders: defineTable({
+    fileId: v.id("addressFiles"),
+    userId: v.string(),
+    kind: v.string(), // notice_deadline | claim_due | custom
+    dueOn: v.string(),
+    channel: v.string(), // email
+    status: v.string(), // scheduled | sent | cancelled
+    sentAt: v.optional(v.number()),
+    toEmail: v.string(),
+  })
+    .index("by_file", ["fileId"])
+    .index("by_status_due", ["status", "dueOn"]),
 });
