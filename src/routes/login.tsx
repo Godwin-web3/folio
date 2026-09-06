@@ -1,21 +1,35 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 import { FolioMark } from "@/components/marks";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
+function friendlyAuthError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const lower = raw.toLowerCase();
+  if (lower.includes("invalidsecret") || lower.includes("invalid password")) {
+    return "Wrong email or password.";
+  }
+  if (lower.includes("already exists") || lower.includes("account") && lower.includes("exist")) {
+    return "That email already has an account — sign in instead.";
+  }
+  if (lower.includes("too short") || lower.includes("password")) {
+    return raw;
+  }
+  // Strip noisy Convex action prefixes for tenants.
+  const cleaned = raw.replace(/^\[CONVEX[^\]]*\]\s*/i, "").replace(/\s+Called by client.*$/i, "").trim();
+  return cleaned || "Sign-in failed. Try again.";
+}
+
 /**
  * Login:
  * - Public Convex/Vercel hosts → Convex Auth Password (product identity).
  * - Other hosts → Better Auth email/password (+ OAuth when enabled).
- * Guest email-as-userId is no longer offered for opening/mutating files;
- * watch links remain unauthenticated read-only.
  */
 export function Login() {
-  const navigate = useNavigate();
-  const { signIn: convexSignIn } = useAuthActions();
+  const { signIn: convexSignIn, signOut: convexSignOut } = useAuthActions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -28,7 +42,6 @@ export function Login() {
 
   const onPublic =
     host.endsWith("vercel.app") || host.endsWith("convex.site");
-  /** Convex-hosted product path uses Convex Auth as identity source of truth. */
   const useConvexPassword = onPublic;
 
   async function submitConvex(mode: "signIn" | "signUp") {
@@ -38,6 +51,12 @@ export function Login() {
       if (!email.includes("@")) throw new Error("Enter a valid email");
       if (password.length < 8) {
         throw new Error("Password must be at least 8 characters");
+      }
+      // Clear any stale token so a prior session cannot poison the next identity.
+      try {
+        await convexSignOut();
+      } catch {
+        /* ignore */
       }
       const params: Record<string, string> = {
         email: email.trim().toLowerCase(),
@@ -51,10 +70,11 @@ export function Login() {
       if (!result.signingIn) {
         throw new Error("Could not complete sign-in. Check email and password.");
       }
-      await navigate({ to: "/files" });
+      // Full navigation so the SPA boots with a settled auth token (avoids
+      // /files racing listCards before identity is attached).
+      window.location.assign("/files");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Sign-in failed");
-    } finally {
+      setErr(friendlyAuthError(e));
       setBusy(false);
     }
   }
@@ -70,10 +90,9 @@ export function Login() {
         const res = await authClient.signIn.email({ email, password });
         if (res.error) throw new Error(res.error.message);
       }
-      await navigate({ to: "/files" });
+      window.location.assign("/files");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Sign-in failed");
-    } finally {
+      setErr(friendlyAuthError(e));
       setBusy(false);
     }
   }
@@ -164,8 +183,7 @@ export function Login() {
             <p className="text-sm text-muted">
               Sign in required to open or change files. Share links (
               <span className="font-medium text-ink">/watch/…</span>) stay
-              read-only without an account. Guest email-as-identity is retired
-              on this host.
+              read-only without an account.
             </p>
           ) : authEnabled && host ? (
             GROK_PROVIDERS.map((p) => (
