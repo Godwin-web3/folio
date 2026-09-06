@@ -114,7 +114,7 @@ export const ensureWatchKey = mutation({
 });
 
 export const listCards = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, { userId: claimed }) => {
     const userId = await resolveUserId(ctx, claimed);
     const owned = await ctx.db
@@ -143,7 +143,7 @@ export const listCards = query({
 });
 
 export const searchCards = query({
-  args: { userId: v.string(), searchQuery: v.string() },
+  args: { userId: v.optional(v.string()), searchQuery: v.string() },
   handler: async (ctx, { userId: claimed, searchQuery }) => {
     const userId = await resolveUserId(ctx, claimed);
     if (!searchQuery) {
