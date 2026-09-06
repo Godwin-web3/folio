@@ -69,6 +69,26 @@ const routeTree = rootRoute.addChildren([
   watchRoute,
 ]);
 
+function FolioRouteError({ error }: { error: Error }) {
+  const message = error?.message ?? "Something went wrong";
+  const isAuth =
+    /unauthorized/i.test(message) || /invalidsecret/i.test(message);
+  return (
+    <main className="min-h-screen bg-paper px-5 py-16 text-ink">
+      <h1 className="font-serif text-3xl">
+        {isAuth ? "Sign in again" : "Something went wrong"}
+      </h1>
+      <p className="mt-3 max-w-md text-sm text-muted break-words">{message}</p>
+      <a href="/login" className="folio-btn mt-6 inline-flex">
+        Back to sign in
+      </a>
+    </main>
+  );
+}
+
 export function getRouter() {
-  return createRouter({ routeTree });
+  return createRouter({
+    routeTree,
+    defaultErrorComponent: FolioRouteError,
+  });
 }
