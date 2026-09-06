@@ -119,6 +119,8 @@ export async function getBundle(
     exhibits,
     deadlines,
     events,
+    ledger: [],
+    checklist: [],
   };
 }
 
