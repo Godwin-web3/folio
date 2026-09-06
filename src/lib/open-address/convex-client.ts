@@ -16,7 +16,7 @@ import type {
   TimelineEvent,
 } from "./types";
 
-export const CONVEX_URL = "https://efficient-raccoon-976.convex.cloud";
+export const CONVEX_URL = import.meta.env.VITE_CONVEX_URL || "https://efficient-raccoon-976.convex.cloud";
 
 export const convex = new ConvexHttpClient(CONVEX_URL);
 export { api };
