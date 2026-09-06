@@ -1,4 +1,5 @@
 import { COOK } from "./jurisdiction";
+import { scoreAddressMatch } from "./address-match";
 
 export type CrawledRecord = {
   agency: string;
@@ -72,6 +73,8 @@ export async function crawlChicagoBuilding(
 
   const out: CrawledRecord[] = [];
   for (const v of violations) {
+    const match = scoreAddressMatch(street, v.address ?? "");
+    if (!match.accept) continue;
     out.push({
       agency: "Chicago Buildings",
       kind: "violation",
@@ -85,6 +88,8 @@ export async function crawlChicagoBuilding(
         bureau: v.department_bureau ?? "",
         address: v.address ?? "",
         cityId: v.id ?? "",
+        matchScore: match.score,
+        matchReason: match.reason,
       },
       rawExcerpt: [v.violation_description, v.violation_ordinance]
         .filter(Boolean)
@@ -93,6 +98,8 @@ export async function crawlChicagoBuilding(
     });
   }
   for (const lic of licenses) {
+    const match = scoreAddressMatch(street, lic.address ?? "");
+    if (!match.accept) continue;
     out.push({
       agency: "Chicago Business Affairs",
       kind: "license",
@@ -103,6 +110,8 @@ export async function crawlChicagoBuilding(
         dba: lic.doing_business_as_name ?? "",
         status: lic.license_status ?? "",
         address: lic.address ?? "",
+        matchScore: match.score,
+        matchReason: match.reason,
       },
       rawExcerpt: `${lic.legal_name ?? ""} d/b/a ${lic.doing_business_as_name ?? ""}`.slice(
         0,

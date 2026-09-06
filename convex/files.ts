@@ -1,6 +1,15 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { caseInbox, COOK, nextStatus, todayIso } from "./lib";
+import { caseInbox, nextStatus, todayIso } from "./lib";
+import { requireFile, resolveUserId } from "./authz";
+
+/**
+ * Watch-link model (share-by-link):
+ * - `watchKey` is a high-entropy capability URL for READ access (legal aid / clinic).
+ * - `getByWatch` is the only public entry that accepts watchKey.
+ * - Mutations never accept watchKey; strangers cannot write, ingest, send mail,
+ *   replace records, or change status via a watch link alone.
+ */
 
 function newWatchKey() {
   return crypto.randomUUID().replaceAll("-", "");
@@ -34,28 +43,24 @@ async function bundleOf(ctx: { db: any }, file: any) {
   };
 }
 
-async function requireFile(
-  ctx: { db: any },
-  fileId: any,
-  userId: string,
-) {
-  const file = await ctx.db.get(fileId);
-  if (!file) throw new Error("File not found");
-  if (file.userId !== userId) {
-    const members = await ctx.db
-      .query("fileMembers")
-      .withIndex("by_file", (q: any) => q.eq("fileId", fileId))
-      .collect();
-    if (!members.some((m: { userId: string }) => m.userId === userId)) {
-      throw new Error("File not found");
-    }
-  }
-  return file;
+/** Read-only watch bundle — same content needed for packet print; no mutate hooks. */
+async function watchBundleOf(ctx: { db: any }, file: any) {
+  const bundle = await bundleOf(ctx, file);
+  return {
+    ...bundle,
+    file: {
+      ...bundle.file,
+      // Capability is the watchKey itself; do not echo mail provider internals.
+      mailInboxId: undefined,
+    },
+    _watchAccess: "read_only" as const,
+  };
 }
 
 export const list = query({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  handler: async (ctx, { userId: claimed }) => {
+    const userId = await resolveUserId(ctx, claimed);
     const owned = await ctx.db
       .query("addressFiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -75,7 +80,8 @@ export const list = query({
 
 export const get = query({
   args: { userId: v.string(), fileId: v.id("addressFiles") },
-  handler: async (ctx, { userId, fileId }) => {
+  handler: async (ctx, { userId: claimed, fileId }) => {
+    const userId = await resolveUserId(ctx, claimed);
     const file = await requireFile(ctx, fileId, userId);
     return bundleOf(ctx, file);
   },
@@ -84,18 +90,21 @@ export const get = query({
 export const getByWatch = query({
   args: { watchKey: v.string() },
   handler: async (ctx, { watchKey }) => {
+    const key = watchKey.trim();
+    if (key.length < 16 || key.length > 128) return null;
     const file = await ctx.db
       .query("addressFiles")
-      .withIndex("by_watch", (q) => q.eq("watchKey", watchKey))
+      .withIndex("by_watch", (q) => q.eq("watchKey", key))
       .first();
     if (!file) return null;
-    return bundleOf(ctx, file);
+    return watchBundleOf(ctx, file);
   },
 });
 
 export const ensureWatchKey = mutation({
   args: { userId: v.string(), fileId: v.id("addressFiles") },
-  handler: async (ctx, { userId, fileId }) => {
+  handler: async (ctx, { userId: claimed, fileId }) => {
+    const userId = await resolveUserId(ctx, claimed);
     const file = await requireFile(ctx, fileId, userId);
     if (file.watchKey) return file.watchKey;
     const watchKey = newWatchKey();
@@ -106,7 +115,8 @@ export const ensureWatchKey = mutation({
 
 export const listCards = query({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  handler: async (ctx, { userId: claimed }) => {
+    const userId = await resolveUserId(ctx, claimed);
     const owned = await ctx.db
       .query("addressFiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -134,7 +144,8 @@ export const listCards = query({
 
 export const searchCards = query({
   args: { userId: v.string(), searchQuery: v.string() },
-  handler: async (ctx, { userId, searchQuery }) => {
+  handler: async (ctx, { userId: claimed, searchQuery }) => {
+    const userId = await resolveUserId(ctx, claimed);
     if (!searchQuery) {
       return [];
     }
@@ -186,15 +197,16 @@ export const create = mutation({
     demoKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await resolveUserId(ctx, args.userId);
     const inbox = args.caseInbox || caseInbox(args.street, args.unit);
     const fileId = await ctx.db.insert("addressFiles", {
-      userId: args.userId,
+      userId,
       street: args.street.trim(),
       unit: args.unit.trim(),
       city: args.city.trim() || "Chicago",
       state: args.state.trim() || "IL",
       zip: args.zip.trim(),
-      jurisdiction: COOK.id,
+      jurisdiction: "cook-county-il",
       status: "opened",
       caseInbox: inbox,
       mailInboxId: args.mailInboxId,
@@ -205,7 +217,7 @@ export const create = mutation({
     if (args.tenantName.trim()) {
       await ctx.db.insert("parties", {
         fileId,
-        userId: args.userId,
+        userId,
         kind: "tenant",
         name: args.tenantName.trim(),
         email: args.tenantEmail ?? "",
@@ -215,7 +227,7 @@ export const create = mutation({
     if (args.ownerName || args.ownerEmail) {
       await ctx.db.insert("parties", {
         fileId,
-        userId: args.userId,
+        userId,
         kind: "owner",
         name: args.ownerName || "Landlord",
         email: args.ownerEmail ?? "",
@@ -225,7 +237,7 @@ export const create = mutation({
     if (args.clinicEmail) {
       await ctx.db.insert("parties", {
         fileId,
-        userId: args.userId,
+        userId,
         kind: "clinic",
         name: "Legal aid",
         email: args.clinicEmail,
@@ -234,7 +246,7 @@ export const create = mutation({
     }
     await ctx.db.insert("timelineEvents", {
       fileId,
-      userId: args.userId,
+      userId,
       kind: "opened",
       title: `File opened for ${args.street}`,
       detail: `Inbox ${inbox}`,
@@ -257,7 +269,8 @@ export const ingestNotice = mutation({
     source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const file = await requireFile(ctx, args.fileId, args.userId);
+    const userId = await resolveUserId(ctx, args.userId);
+    const file = await requireFile(ctx, args.fileId, userId);
     await ctx.db.insert("notices", {
       fileId: args.fileId,
       userId: file.userId,
@@ -301,25 +314,35 @@ export const addEvent = mutation({
     detail: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("timelineEvents", args);
+    const userId = await resolveUserId(ctx, args.userId);
+    const file = await requireFile(ctx, args.fileId, userId);
+    await ctx.db.insert("timelineEvents", {
+      fileId: args.fileId,
+      userId: file.userId,
+      kind: args.kind,
+      title: args.title,
+      detail: args.detail,
+    });
   },
 });
 
 export const setStatus = mutation({
   args: {
     fileId: v.id("addressFiles"),
+    userId: v.string(),
     status: v.string(),
   },
-  handler: async (ctx, { fileId, status }) => {
-    const file = await ctx.db.get(fileId);
-    if (!file) throw new Error("File not found");
+  handler: async (ctx, { fileId, userId: claimed, status }) => {
+    const userId = await resolveUserId(ctx, claimed);
+    const file = await requireFile(ctx, fileId, userId);
     await ctx.db.patch(fileId, { status: nextStatus(file.status, status) });
   },
 });
 
 export const findDemo = query({
   args: { userId: v.string(), demoKey: v.string() },
-  handler: async (ctx, { userId, demoKey }) => {
+  handler: async (ctx, { userId: claimed, demoKey }) => {
+    const userId = await resolveUserId(ctx, claimed);
     return ctx.db
       .query("addressFiles")
       .withIndex("by_user_demo", (q) =>

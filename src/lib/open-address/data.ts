@@ -96,6 +96,7 @@ export async function sendLetter(
     messageId: asMessageId(messageId),
   });
   const msg = await convex.query(api.mail.getMessage, {
+    userId,
     messageId: asMessageId(messageId),
   });
   if (!msg) throw new Error("Message not found");
@@ -110,6 +111,7 @@ export async function logReply(
 ): Promise<void> {
   const parsed = fallbackInbound(body, todayIso());
   await convex.mutation(api.mail.logInbound, {
+    userId,
     fileId: asFileId(fileId),
     from: fromEmail ?? "",
     body,
