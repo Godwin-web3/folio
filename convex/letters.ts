@@ -162,8 +162,14 @@ export const assemble = mutation({
       .query("messages")
       .withIndex("by_file", (q) => q.eq("fileId", fileId))
       .collect();
-    const pieces: { title: string; kind: string; table: string; id: string; body: string }[] =
-      [];
+    const pieces: {
+      title: string;
+      kind: string;
+      table: string;
+      id: string;
+      body: string;
+      storageId?: typeof notices[0]["storageId"];
+    }[] = [];
     const n = notices[0];
     if (n) {
       pieces.push({
@@ -171,6 +177,7 @@ export const assemble = mutation({
         kind: "notice",
         table: "notices",
         id: n._id,
+        storageId: n.storageId,
         body: [
           `EXHIBIT A — NOTICE`,
           ``,
@@ -184,6 +191,7 @@ export const assemble = mutation({
             ? `Amount claimed: $${(n.amountCents / 100).toFixed(2)}`
             : "",
           `Source: ${n.source}`,
+          n.storageId ? `Notice photo: on file (storage attached).` : "",
           ``,
           `— Transcription —`,
           n.rawText,
@@ -191,6 +199,24 @@ export const assemble = mutation({
           .filter(Boolean)
           .join("\n"),
       });
+      if (n.servedPhotoStorageId) {
+        pieces.push({
+          title: "Proof of service",
+          kind: "service",
+          table: "notices",
+          id: n._id,
+          storageId: n.servedPhotoStorageId,
+          body: [
+            `EXHIBIT — PROOF OF SERVICE`,
+            ``,
+            `Method: ${n.servedMethod ?? "not stated"}`,
+            n.servedAt
+              ? `Filed at: ${new Date(n.servedAt).toISOString()}`
+              : "Filed: timestamp on file",
+            `Photo of service is attached to this exhibit.`,
+          ].join("\n"),
+        });
+      }
     }
     const viol = records.filter((r) => r.kind === "violation");
     if (viol[0]) {
@@ -250,15 +276,21 @@ export const assemble = mutation({
     const exhibits = [];
     for (let i = 0; i < pieces.length; i += 1) {
       const p = pieces[i];
+      const label = LABELS[i] ?? String(i + 1);
+      const body = p.body.replace(
+        /^EXHIBIT(?: [A-Z0-9]+)?(?: —)?/,
+        `EXHIBIT ${label} —`,
+      );
       const id = await ctx.db.insert("exhibits", {
         fileId,
         userId: file.userId,
-        label: LABELS[i] ?? String(i + 1),
+        label,
         title: p.title,
         kind: p.kind,
         sourceTable: p.table,
         sourceId: p.id,
-        body: p.body,
+        body,
+        storageId: p.storageId,
       });
       exhibits.push(id);
     }
