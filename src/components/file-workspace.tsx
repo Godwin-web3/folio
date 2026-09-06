@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
@@ -59,12 +59,45 @@ function FileShell({
   const parsePhoto = useAction(api.photo.parseNoticePhoto);
   const parseText = useAction(api.photo.parseNoticeText);
   const ensureWatch = useMutation(api.files.ensureWatchKey);
+  const revokeWatch = useMutation(api.files.revokeWatchKey);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noticeText, setNoticeText] = useState("");
   const [replyText, setReplyText] = useState("");
+  const [flashClaimId, setFlashClaimId] = useState<string | null>(null);
+  const prevClaimIdsRef = useRef<Set<string>>(new Set());
 
   const bundle = raw ? mapBundle(raw) : null;
+
+  const claimIdsKey = bundle
+    ? bundle.claims.map((c) => `${c.id}:${c.kind}`).join("|")
+    : "";
+
+  useEffect(() => {
+    if (!bundle) return;
+    const ids = bundle.claims.map((c) => c.id);
+    const prev = prevClaimIdsRef.current;
+    const grew = ids.some((id) => !prev.has(id));
+    let timer: number | undefined;
+    if (prev.size > 0 && grew) {
+      const newestPromise = [...bundle.claims]
+        .filter((c) => c.kind === "promise" && !prev.has(c.id))
+        .at(-1);
+      const flashId =
+        newestPromise?.id ??
+        [...ids].reverse().find((id) => !prev.has(id)) ??
+        null;
+      if (flashId) {
+        setFlashClaimId(flashId);
+        timer = window.setTimeout(() => setFlashClaimId(null), 3000);
+      }
+    }
+    prevClaimIdsRef.current = new Set(ids);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on claim id/kind set
+  }, [claimIdsKey]);
 
   async function run(label: string, fn: () => Promise<void>) {
     if (busy) return;
@@ -91,7 +124,15 @@ function FileShell({
   return (
     <div className="min-h-screen bg-paper text-ink">
       <AppHeader subtitle="Cook County" title={addressLabel(bundle.file)} />
-      <CaseFace bundle={bundle} />
+      <CaseFace
+        bundle={bundle}
+        flashPromise={Boolean(
+          flashClaimId &&
+            bundle.claims.some(
+              (c) => c.kind === "promise" && c.id === flashClaimId,
+            ),
+        )}
+      />
       <StepRail fileId={fileId} step={step} />
       <main className="mx-auto max-w-lg px-4 py-6 pb-28">
         {error ? (
@@ -151,6 +192,7 @@ function FileShell({
           <LettersScreen
             bundle={bundle}
             busy={busy}
+            flashClaimId={flashClaimId}
             replyText={replyText}
             setReplyText={setReplyText}
             onDraft={() =>
@@ -211,6 +253,14 @@ function FileShell({
               await copyText(href);
               return href;
             }}
+            onRevokeWatch={() =>
+              void run("revoke-watch", async () => {
+                await revokeWatch({
+                  userId,
+                  fileId: asFileId(fileId),
+                });
+              })
+            }
           />
         ) : null}
       </main>
@@ -425,6 +475,7 @@ function NoticeScreen({
 function LettersScreen({
   bundle,
   busy,
+  flashClaimId,
   replyText,
   setReplyText,
   onDraft,
@@ -435,6 +486,7 @@ function LettersScreen({
 }: {
   bundle: FileBundle;
   busy: string | null;
+  flashClaimId: string | null;
   replyText: string;
   setReplyText: (v: string) => void;
   onDraft: () => void;
@@ -475,7 +527,11 @@ function LettersScreen({
       <section className="space-y-3">
         <h3 className="font-serif text-xl">If they name a day</h3>
         {promise ? (
-          <div className="folio-card border-stamp/40 px-4 py-4">
+          <div
+            className={`folio-card border-stamp/40 px-4 py-4${
+              flashClaimId === promise.id ? " folio-claim-flash" : ""
+            }`}
+          >
             <p className="text-[10px] uppercase tracking-[0.16em] text-stamp">
               Claim
             </p>
@@ -588,11 +644,13 @@ function PacketScreen({
   busy,
   onPacket,
   onWatch,
+  onRevokeWatch,
 }: {
   bundle: FileBundle;
   busy: string | null;
   onPacket: () => void;
   onWatch: () => Promise<string>;
+  onRevokeWatch: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -617,6 +675,25 @@ function PacketScreen({
       >
         {copied ? "Watch link copied" : "Copy watch link for legal aid"}
       </button>
+      {bundle.file.watch_key ? (
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => {
+            if (
+              !window.confirm(
+                "Revoke the watch link? Anyone with the old link will lose access.",
+              )
+            ) {
+              return;
+            }
+            onRevokeWatch();
+          }}
+          className="folio-btn-ghost w-full border-stamp text-stamp"
+        >
+          {busy === "revoke-watch" ? "Revoking…" : "Revoke watch link"}
+        </button>
+      ) : null}
       {bundle.exhibits.length === 0 ? (
         <button
           type="button"
