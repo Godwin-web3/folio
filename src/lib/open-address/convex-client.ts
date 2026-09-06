@@ -3,12 +3,14 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
   AddressFile,
+  ChecklistItem,
   Claim,
   Deadline,
   Exhibit,
   FileBundle,
   FileStatus,
   Issue,
+  LedgerEntry,
   Message,
   Notice,
   Party,
@@ -38,6 +40,8 @@ function asFile(doc: Record<string, unknown>): AddressFile {
     state: String(doc.state),
     zip: String(doc.zip ?? ""),
     jurisdiction: String(doc.jurisdiction ?? "cook-county-il"),
+    jurisdiction_label: (doc.jurisdictionLabel as string | undefined) ?? null,
+    court_case_number: (doc.courtCaseNumber as string | undefined) ?? null,
     status: (doc.status as FileStatus) ?? "opened",
     case_inbox: String(doc.caseInbox),
     mail_inbox_id: (doc.mailInboxId as string | undefined) ?? null,
@@ -75,6 +79,10 @@ function asNotice(doc: Record<string, unknown>): Notice {
     reason: String(doc.reason ?? ""),
     raw_text: String(doc.rawText ?? ""),
     source: String(doc.source ?? "paste"),
+    notice_photo_url: (doc.noticePhotoUrl as string | null | undefined) ?? null,
+    proof_photo_url: (doc.proofPhotoUrl as string | null | undefined) ?? null,
+    served_method: (doc.servedMethod as string | undefined) ?? null,
+    served_at: doc.servedAt ? iso(doc.servedAt as number) : null,
     created_at: iso(doc._creationTime as number),
   };
 }
@@ -155,6 +163,35 @@ function asExhibit(doc: Record<string, unknown>): Exhibit {
     source_table: String(doc.sourceTable ?? ""),
     source_id: String(doc.sourceId ?? ""),
     body: String(doc.body ?? ""),
+    storage_id: doc.storageId ? String(doc.storageId) : null,
+    created_at: iso(doc._creationTime as number),
+  };
+}
+
+function asLedger(doc: Record<string, unknown>): LedgerEntry {
+  return {
+    id: String(doc._id),
+    file_id: String(doc.fileId),
+    user_id: String(doc.userId),
+    kind: String(doc.kind),
+    amount_cents: Number(doc.amountCents ?? 0),
+    note: String(doc.note ?? ""),
+    occurred_on: String(doc.occurredOn ?? ""),
+    related_notice_id: doc.relatedNoticeId ? String(doc.relatedNoticeId) : null,
+    created_at: iso(doc._creationTime as number),
+  };
+}
+
+function asChecklist(doc: Record<string, unknown>): ChecklistItem {
+  return {
+    id: String(doc._id),
+    file_id: String(doc.fileId),
+    user_id: String(doc.userId),
+    code: String(doc.code),
+    title: String(doc.title),
+    detail: String(doc.detail ?? ""),
+    status: String(doc.status ?? "open"),
+    source: String(doc.source ?? "custom"),
     created_at: iso(doc._creationTime as number),
   };
 }
@@ -203,6 +240,8 @@ export function mapBundle(raw: {
   exhibits: unknown[];
   deadlines: unknown[];
   events: unknown[];
+  ledger?: unknown[];
+  checklist?: unknown[];
 }): FileBundle {
   return {
     file: asFile(raw.file as Record<string, unknown>),
@@ -215,6 +254,10 @@ export function mapBundle(raw: {
     exhibits: raw.exhibits.map((p) => asExhibit(p as Record<string, unknown>)),
     deadlines: raw.deadlines.map((p) => asDeadline(p as Record<string, unknown>)),
     events: raw.events.map((p) => asEvent(p as Record<string, unknown>)),
+    ledger: (raw.ledger ?? []).map((p) => asLedger(p as Record<string, unknown>)),
+    checklist: (raw.checklist ?? []).map((p) =>
+      asChecklist(p as Record<string, unknown>),
+    ),
   };
 }
 
