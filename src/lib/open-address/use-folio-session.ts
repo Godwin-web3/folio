@@ -18,6 +18,8 @@ export type FolioSession = {
   kind: "convex" | "auth" | "guest";
 };
 
+const folioSpa = import.meta.env.VITE_FOLIO_SPA === "1";
+
 export function useFolioSession(): {
   session: FolioSession | null;
   isPending: boolean;
@@ -31,12 +33,12 @@ export function useFolioSession(): {
   const [guest, setGuest] = useState<FolioGuest | null | undefined>(undefined);
 
   useEffect(() => {
-    setGuest(readGuest());
+    setGuest(folioSpa ? null : readGuest());
   }, []);
 
   const noopSignOut = async () => undefined;
 
-  // Convex Auth is the source of truth for Convex-backed product identity.
+  // Wait for Convex Auth + me() when a token is present.
   if (convexAuthLoading || (isAuthenticated && convexMe === undefined)) {
     return {
       session: null,
@@ -64,7 +66,25 @@ export function useFolioSession(): {
     };
   }
 
-  const folioSpa = import.meta.env.VITE_FOLIO_SPA === "1";
+  // Token present but server rejects identity — treat as signed out, don't fall
+  // through to guest / Better Auth and don't leave /files querying as "authed".
+  if (isAuthenticated && convexMe === null) {
+    return {
+      session: null,
+      isPending: false,
+      signOutGuest: () => undefined,
+      signOut: async () => {
+        clearGuest();
+        try {
+          await convexSignOut();
+        } catch {
+          /* ignore */
+        }
+        window.location.href = "/login";
+      },
+    };
+  }
+
   if (user && !folioSpa) {
     return {
       session: {
@@ -75,12 +95,11 @@ export function useFolioSession(): {
       },
       isPending: false,
       signOutGuest: () => undefined,
-      // Better Auth sign-out stays on UserButton / auth client for that stack.
       signOut: noopSignOut,
     };
   }
 
-  if (authPending || guest === undefined) {
+  if (!folioSpa && (authPending || guest === undefined)) {
     return {
       session: null,
       isPending: true,
@@ -89,7 +108,7 @@ export function useFolioSession(): {
     };
   }
 
-  if (guest) {
+  if (!folioSpa && guest) {
     return {
       session: {
         userId: guest.email,
