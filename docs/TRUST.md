@@ -54,6 +54,7 @@ queries/mutations.
 - files.getByWatch is the only public entry that accepts it.
 - Mutations never accept watchKey. Link holders cannot ingest notices, send mail, replace building records, or change status.
 - UI labels the surface read only.
+- Owners revoke the capability with `revokeWatchKey` (clears `watchKey`).
 
 ## Building identity
 
@@ -66,3 +67,21 @@ queries/mutations.
 - Structured extraction (promiseExtract) requires commitment language and a concrete date/weekday before classifying a dated promise.
 - Durable claims + deadlines are created only when promiseOn is present — no invented +3 days due dates.
 - Undated we will fix language is stored as inbound mail without a dated claim.
+
+## AgentMail webhook (fail-closed)
+
+Inbound AgentMail webhooks **always** require `AGENTMAIL_WEBHOOK_SECRET`.
+AgentMail must send matching header `x-agentmail-secret`.
+
+- Env: `AGENTMAIL_WEBHOOK_SECRET` (Convex + app server)
+- Header: `x-agentmail-secret`
+- If the secret is unset **or** the header mismatches → **401**
+- Soft-accept when unset is not allowed (both `convex/http.ts` and
+  `src/routes/api/mail/webhook.ts`)
+
+## Watch link revoke
+
+Owners can call `files.revokeWatchKey` to clear `watchKey`. Old share links
+stop resolving via `getByWatch`. A timeline event `Watch link revoked` is
+recorded when a key was present.
+
