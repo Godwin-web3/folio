@@ -114,9 +114,27 @@
   }
 }
 
+
+@keyframes folio-claim-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    outline: 2px solid transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-stamp) 28%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--color-stamp) 55%, transparent);
+  }
+}
+
+.folio-claim-flash {
+  animation: folio-claim-flash 1.6s ease-in-out 2;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
   }
 }
 
