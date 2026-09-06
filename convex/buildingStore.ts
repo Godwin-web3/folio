@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { nextStatus, todayIso } from "./lib";
+import { requireFile, resolveUserId } from "./authz";
 
 export const replace = mutation({
   args: {
@@ -17,9 +18,9 @@ export const replace = mutation({
       }),
     ),
   },
-  handler: async (ctx, { userId, fileId, records }) => {
-    const file = await ctx.db.get(fileId);
-    if (!file || file.userId !== userId) throw new Error("File not found");
+  handler: async (ctx, { userId: claimed, fileId, records }) => {
+    const userId = await resolveUserId(ctx, claimed);
+    const file = await requireFile(ctx, fileId, userId);
     const existing = await ctx.db
       .query("records")
       .withIndex("by_file", (q) => q.eq("fileId", fileId))
@@ -29,7 +30,7 @@ export const replace = mutation({
     for (const rec of records) {
       await ctx.db.insert("records", {
         fileId,
-        userId,
+        userId: file.userId,
         agency: rec.agency,
         kind: rec.kind,
         title: rec.title,
@@ -43,7 +44,7 @@ export const replace = mutation({
     if (openCount) {
       await ctx.db.insert("issues", {
         fileId,
-        userId,
+        userId: file.userId,
         kind: "habitability",
         title: "Open city building violations",
         detail: `${openCount} open`,
@@ -56,7 +57,7 @@ export const replace = mutation({
     });
     await ctx.db.insert("timelineEvents", {
       fileId,
-      userId,
+      userId: file.userId,
       kind: "records",
       title: `Pulled ${records.length} records`,
       detail: `${openCount} open violations`,

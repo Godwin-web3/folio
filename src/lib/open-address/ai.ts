@@ -1,5 +1,6 @@
 import type { InboundParse, NoticeParse } from "./types";
 import { addDaysIso, todayIso } from "./ids";
+import { extractInboundPromise } from "./promise-extract";
 
 const MODEL = "grok-4.5";
 
@@ -131,32 +132,34 @@ export async function parseInbound(
   body: string,
   today: string,
 ): Promise<InboundParse> {
-  const lower = body.toLowerCase();
-  const promise = /will (fix|repair|send|pay)|friday|next week|by \w+day/.test(
-    lower,
-  );
-  const denial = /denied|will not|no refund|not responsible/.test(lower);
-  const court = /court date|appearance|summons/.test(lower);
+  const extracted = extractInboundPromise(body, today);
   const fb: InboundParse = {
-    classification: court
-      ? "court_date"
-      : promise
-        ? "promise"
-        : denial
-          ? "denial"
-          : "other",
-    promiseOn: promise ? addDaysIso(today, 3) : null,
-    summary: body.replace(/\s+/g, " ").slice(0, 240),
+    classification: extracted.classification,
+    promiseOn: extracted.promiseOn,
+    summary: extracted.summary,
   };
   const content = await chatJson(
-    `Classify this landlord/city email. JSON keys: classification (promise|denial|court_date|records_production|other), promiseOn (YYYY-MM-DD or null if they name a date, else null), summary (one sentence).\nToday is ${today}.\n\n${body.slice(0, 3000)}`,
+    `Classify this landlord/city email. JSON keys: classification (promise|denial|court_date|records_production|other), promiseOn (YYYY-MM-DD only if they name a concrete date or weekday; otherwise null — never invent a date), summary (one sentence).\nToday is ${today}.\n\n${body.slice(0, 3000)}`,
   );
   if (!content) return fb;
   try {
     const parsed = JSON.parse(content) as Partial<InboundParse>;
+    const classification = parsed.classification || fb.classification;
+    // Prefer model date when present; never fall back to an invented date.
+    let promiseOn =
+      parsed.promiseOn !== undefined ? parsed.promiseOn : fb.promiseOn;
+    if (classification === "promise" && !promiseOn) {
+      // Dated claim requires a date — downgrade to other if none.
+      return {
+        classification: "other",
+        promiseOn: null,
+        summary: parsed.summary || fb.summary,
+      };
+    }
+    if (classification !== "promise") promiseOn = null;
     return {
-      classification: parsed.classification || fb.classification,
-      promiseOn: parsed.promiseOn ?? fb.promiseOn,
+      classification,
+      promiseOn,
       summary: parsed.summary || fb.summary,
     };
   } catch {

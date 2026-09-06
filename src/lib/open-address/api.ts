@@ -112,6 +112,7 @@ export const approveSendFn = createServerFn({ method: "POST" })
       messageId: asMessageId(data.messageId),
     });
     const msg = await convex.query(api.mail.getMessage, {
+      userId: context.userId,
       messageId: asMessageId(data.messageId),
     });
     if (!msg) throw new Error("Message not found");
@@ -132,6 +133,7 @@ export const logInboundFn = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const parsed = await parseInbound(data.body, new Date().toISOString().slice(0, 10));
     await convex.mutation(api.mail.logInbound, {
+      userId: context.userId,
       fileId: asFileId(data.fileId),
       from: data.fromEmail ?? "",
       body: data.body,

@@ -1,7 +1,9 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api, components } from "./_generated/api";
+import { internal, components } from "./_generated/api";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
+import { extractInboundPromise } from "./lib/promiseExtract";
+import { todayIso } from "./lib";
 
 const http = httpRouter();
 
@@ -10,6 +12,8 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const secret = process.env.AGENTMAIL_WEBHOOK_SECRET;
+    // Fail closed when secret is configured; when unset, still accept (dev) but
+    // never expose write paths without inbox routing.
     if (secret && request.headers.get("x-agentmail-secret") !== secret) {
       return new Response("unauthorized", { status: 401 });
     }
@@ -22,17 +26,18 @@ http.route({
     if (text.trim().length < 8) {
       return new Response(JSON.stringify({ ok: false }), { status: 202 });
     }
-    const file = await ctx.runQuery(api.mail.findByInbox, {
+    const file = await ctx.runQuery(internal.mail.findByInbox, {
       inbox: inboxId || to,
     });
     if (!file) return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    const promise = /will (fix|repair)|friday|next week/.test(text.toLowerCase());
-    await ctx.runMutation(api.mail.logInbound, {
+    const extracted = extractInboundPromise(text, todayIso());
+    await ctx.runMutation(internal.mail.logInboundInternal, {
       fileId: file._id,
       from,
       body: text,
-      classification: promise ? "promise" : "other",
-      summary: text.slice(0, 240),
+      classification: extracted.classification,
+      summary: extracted.summary,
+      promiseOn: extracted.promiseOn ?? undefined,
     });
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }),

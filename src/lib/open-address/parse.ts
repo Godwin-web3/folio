@@ -1,5 +1,6 @@
 import type { InboundParse, NoticeParse } from "./types";
 import { addDaysIso, todayIso } from "./ids";
+import { extractInboundPromise } from "./promise-extract";
 
 export function fallbackNotice(raw: string): NoticeParse {
   const text = raw.replace(/\s+/g, " ");
@@ -39,21 +40,10 @@ export function fallbackNotice(raw: string): NoticeParse {
 }
 
 export function fallbackInbound(body: string, today: string): InboundParse {
-  const lower = body.toLowerCase();
-  const promise = /will (fix|repair|send|pay)|friday|next week|by \w+day/.test(
-    lower,
-  );
-  const denial = /denied|will not|no refund|not responsible/.test(lower);
-  const court = /court date|appearance|summons/.test(lower);
+  const extracted = extractInboundPromise(body, today);
   return {
-    classification: court
-      ? "court_date"
-      : promise
-        ? "promise"
-        : denial
-          ? "denial"
-          : "other",
-    promiseOn: promise ? addDaysIso(today, 3) : null,
-    summary: body.replace(/\s+/g, " ").slice(0, 240),
+    classification: extracted.classification,
+    promiseOn: extracted.promiseOn,
+    summary: extracted.summary,
   };
 }

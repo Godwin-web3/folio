@@ -4,6 +4,7 @@ import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { COOK, nextStatus } from "./lib";
 import { draftWithModel } from "./ai";
+import { requireFile, resolveUserId } from "./authz";
 
 const LABELS = ["A", "B", "C", "D", "E", "F"];
 
@@ -19,8 +20,8 @@ export const insertDrafts = mutation({
     coverBody: v.string(),
   },
   handler: async (ctx, args) => {
-    const file = await ctx.db.get(args.fileId);
-    if (!file || file.userId !== args.userId) throw new Error("File not found");
+    const userId = await resolveUserId(ctx, args.userId);
+    const file = await requireFile(ctx, args.fileId, userId);
     const draftId = await ctx.db.insert("messages", {
       fileId: args.fileId,
       userId: file.userId,
@@ -137,9 +138,9 @@ export const propose = action({
 
 export const assemble = mutation({
   args: { userId: v.string(), fileId: v.id("addressFiles") },
-  handler: async (ctx, { userId, fileId }) => {
-    const file = await ctx.db.get(fileId);
-    if (!file || file.userId !== userId) throw new Error("File not found");
+  handler: async (ctx, { userId: claimed, fileId }) => {
+    const userId = await resolveUserId(ctx, claimed);
+    const file = await requireFile(ctx, fileId, userId);
     const existing = await ctx.db
       .query("exhibits")
       .withIndex("by_file", (q) => q.eq("fileId", fileId))
