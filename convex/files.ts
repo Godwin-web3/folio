@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { caseInbox, nextStatus, todayIso } from "./lib";
 import { requireFile, resolveUserId } from "./authz";
+import { scheduleForFile } from "./reminders";
+import { DEFAULT_JURISDICTION_ID, getJurisdiction } from "./lib/jurisdictions";
 
 /**
  * Watch-link model (share-by-link):
@@ -16,9 +18,9 @@ function newWatchKey() {
   return crypto.randomUUID().replaceAll("-", "");
 }
 
-async function bundleOf(ctx: { db: any }, file: any) {
+async function bundleOf(ctx: { db: any; storage: any }, file: any) {
   const fileId = file._id;
-  const [parties, notices, records, issues, claims, messages, exhibits, deadlines, events] =
+  const [parties, noticesRaw, records, issues, claims, messages, exhibits, deadlines, events, ledger, checklist] =
     await Promise.all([
       ctx.db.query("parties").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
       ctx.db.query("notices").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
@@ -29,9 +31,25 @@ async function bundleOf(ctx: { db: any }, file: any) {
       ctx.db.query("exhibits").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
       ctx.db.query("deadlines").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
       ctx.db.query("timelineEvents").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("ledgerEntries").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
+      ctx.db.query("checklistItems").withIndex("by_file", (q: any) => q.eq("fileId", fileId)).collect(),
     ]);
+  const notices = [];
+  for (const n of noticesRaw) {
+    notices.push({
+      ...n,
+      noticePhotoUrl: n.storageId ? await ctx.storage.getUrl(n.storageId) : null,
+      proofPhotoUrl: n.servedPhotoStorageId
+        ? await ctx.storage.getUrl(n.servedPhotoStorageId)
+        : null,
+    });
+  }
+  const j = getJurisdiction(file.jurisdiction);
   return {
-    file,
+    file: {
+      ...file,
+      jurisdictionLabel: file.jurisdictionLabel ?? j.label,
+    },
     parties,
     notices,
     records,
@@ -41,11 +59,13 @@ async function bundleOf(ctx: { db: any }, file: any) {
     exhibits,
     deadlines,
     events,
+    ledger,
+    checklist,
   };
 }
 
 /** Read-only watch bundle — same content needed for packet print; no mutate hooks. */
-async function watchBundleOf(ctx: { db: any }, file: any) {
+async function watchBundleOf(ctx: { db: any; storage: any }, file: any) {
   const bundle = await bundleOf(ctx, file);
   return {
     ...bundle,
@@ -219,6 +239,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const userId = await resolveUserId(ctx, args.userId);
     const inbox = args.caseInbox || caseInbox(args.street, args.unit);
+    const j = getJurisdiction(DEFAULT_JURISDICTION_ID);
     const fileId = await ctx.db.insert("addressFiles", {
       userId,
       street: args.street.trim(),
@@ -226,7 +247,8 @@ export const create = mutation({
       city: args.city.trim() || "Chicago",
       state: args.state.trim() || "IL",
       zip: args.zip.trim(),
-      jurisdiction: "cook-county-il",
+      jurisdiction: DEFAULT_JURISDICTION_ID,
+      jurisdictionLabel: j.label,
       status: "opened",
       caseInbox: inbox,
       mailInboxId: args.mailInboxId,
@@ -287,11 +309,12 @@ export const ingestNotice = mutation({
     reason: v.string(),
     rawText: v.string(),
     source: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const userId = await resolveUserId(ctx, args.userId);
     const file = await requireFile(ctx, args.fileId, userId);
-    await ctx.db.insert("notices", {
+    const noticeId = await ctx.db.insert("notices", {
       fileId: args.fileId,
       userId: file.userId,
       noticeType: args.noticeType,
@@ -302,7 +325,19 @@ export const ingestNotice = mutation({
       reason: args.reason,
       rawText: args.rawText,
       source: args.source || "paste",
+      storageId: args.storageId,
     });
+    if (args.amountCents != null && Number.isFinite(args.amountCents)) {
+      await ctx.db.insert("ledgerEntries", {
+        fileId: args.fileId,
+        userId: file.userId,
+        kind: "notice",
+        amountCents: Math.round(args.amountCents),
+        note: `${args.noticeType.replaceAll("_", " ")} amount claimed`,
+        occurredOn: args.servedOn || todayIso(),
+        relatedNoticeId: noticeId,
+      });
+    }
     if (args.deadlineOn) {
       await ctx.db.insert("deadlines", {
         fileId: args.fileId,
@@ -310,6 +345,19 @@ export const ingestNotice = mutation({
         kind: "notice",
         title: "Respond to notice / cure or appear",
         dueOn: args.deadlineOn,
+      });
+      const parties = await ctx.db
+        .query("parties")
+        .withIndex("by_file", (q) => q.eq("fileId", args.fileId))
+        .collect();
+      const tenant = parties.find((p) => p.kind === "tenant" && p.email?.trim());
+      const toEmail = tenant?.email?.trim() ?? "";
+      await scheduleForFile(ctx, {
+        fileId: args.fileId,
+        userId: file.userId,
+        kind: "notice_deadline",
+        dueOn: args.deadlineOn,
+        toEmail,
       });
     }
     await ctx.db.patch(args.fileId, {
@@ -322,6 +370,7 @@ export const ingestNotice = mutation({
       title: `${args.noticeType.replaceAll("_", " ")} filed on the docket`,
       detail: args.plaintiff,
     });
+    return noticeId;
   },
 });
 
