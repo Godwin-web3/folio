@@ -29,7 +29,14 @@ export function HomeFiles() {
 
 function HomeShell({ userId, name }: { userId: string; name: string }) {
   const navigate = useNavigate();
-  const rawCards = useQuery(api.files.listCards, { userId });
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const allCards = useQuery(api.files.listCards, { userId });
+  const searchedCards = useQuery(api.files.searchCards,
+    searchQuery ? { userId, searchQuery } : "skip"
+  );
+  const rawCards = searchQuery ? searchedCards : allCards;
+
   const openDemo = useAction(api.demo.openCase);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,8 +132,21 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
           </p>
         ) : null}
 
+        {(allCards && allCards.length > 0) && (
+          <div className="mt-6 mb-2">
+            <Field label="Search by street name">
+              <input
+                className="folio-input"
+                placeholder="e.g. Berteau"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </Field>
+          </div>
+        )}
+
         {cards.length ? (
-          <ul className="mt-8 space-y-3">
+          <ul className="mt-4 space-y-3">
             {cards.map(({ file, pulse }) => (
               <li key={file.id}>
                 <Link

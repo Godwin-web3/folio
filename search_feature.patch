@@ -1,0 +1,119 @@
+diff --git a/convex/files.ts b/convex/files.ts
+index 599fdc2..ce96643 100644
+--- a/convex/files.ts
++++ b/convex/files.ts
+@@ -132,6 +132,41 @@ export const listCards = query({
+   },
+ });
+
++export const searchCards = query({
++  args: { userId: v.string(), searchQuery: v.string() },
++  handler: async (ctx, { userId, searchQuery }) => {
++    if (!searchQuery) {
++      return [];
++    }
++
++    const owned = await ctx.db
++      .query("addressFiles")
++      .withSearchIndex("search_street", (q) =>
++        q.search("street", searchQuery).eq("userId", userId)
++      )
++      .collect();
++
++    const cards = [];
++    for (const file of owned) {
++      const [notices, records, claims] = await Promise.all([
++        ctx.db.query("notices").withIndex("by_file", (q) => q.eq("fileId", file._id)).collect(),
++        ctx.db.query("records").withIndex("by_file", (q) => q.eq("fileId", file._id)).collect(),
++        ctx.db.query("claims").withIndex("by_file", (q) => q.eq("fileId", file._id)).collect(),
++      ]);
++      const promise = claims.find((c) => c.kind === "promise");
++      cards.push({
++        file,
++        deadlineOn: notices[0]?.deadlineOn ?? null,
++        noticeType: notices[0]?.noticeType ?? null,
++        cityCount: records.filter((r) => r.kind === "violation").length,
++        promiseDue: promise?.dueOn ?? null,
++        promiseText: promise?.description ?? null,
++      });
++    }
++    return cards;
++  },
++});
++
+ export const create = mutation({
+   args: {
+     userId: v.string(),
+diff --git a/convex/schema.ts b/convex/schema.ts
+index ba05cc5..6faf64f 100644
+--- a/convex/schema.ts
++++ b/convex/schema.ts
+@@ -21,7 +21,11 @@ export default defineSchema({
+     .index("by_inbox", ["caseInbox"])
+     .index("by_mail_inbox", ["mailInboxId"])
+     .index("by_user_demo", ["userId", "demoKey"])
+-    .index("by_watch", ["watchKey"]),
++    .index("by_watch", ["watchKey"])
++    .searchIndex("search_street", {
++      searchField: "street",
++      filterFields: ["userId"]
++    }),
+
+   fileMembers: defineTable({
+     fileId: v.id("addressFiles"),
+diff --git a/src/components/home-files.tsx b/src/components/home-files.tsx
+index 8393083..5ba956c 100644
+--- a/src/components/home-files.tsx
++++ b/src/components/home-files.tsx
+@@ -29,7 +29,14 @@ export function HomeFiles() {
+
+ function HomeShell({ userId, name }: { userId: string; name: string }) {
+   const navigate = useNavigate();
+-  const rawCards = useQuery(api.files.listCards, { userId });
++
++  const [searchQuery, setSearchQuery] = useState("");
++  const allCards = useQuery(api.files.listCards, { userId });
++  const searchedCards = useQuery(api.files.searchCards,
++    searchQuery ? { userId, searchQuery } : "skip"
++  );
++  const rawCards = searchQuery ? searchedCards : allCards;
++
+   const openDemo = useAction(api.demo.openCase);
+   const [busy, setBusy] = useState<string | null>(null);
+   const [error, setError] = useState<string | null>(null);
+@@ -125,8 +132,21 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
+           </p>
+         ) : null}
+
++        {(allCards && allCards.length > 0) && (
++          <div className="mt-6 mb-2">
++            <Field label="Search by street name">
++              <input
++                className="folio-input"
++                placeholder="e.g. Berteau"
++                value={searchQuery}
++                onChange={(e) => setSearchQuery(e.target.value)}
++              />
++            </Field>
++          </div>
++        )}
++
+         {cards.length ? (
+-          <ul className="mt-8 space-y-3">
++          <ul className="mt-4 space-y-3">
+             {cards.map(({ file, pulse }) => (
+               <li key={file.id}>
+                 <Link
+diff --git a/src/lib/open-address/convex-client.ts b/src/lib/open-address/convex-client.ts
+index 81023db..38a5fc5 100644
+--- a/src/lib/open-address/convex-client.ts
++++ b/src/lib/open-address/convex-client.ts
+@@ -16,7 +16,7 @@ import type {
+   TimelineEvent,
+ } from "./types";
+
+-export const CONVEX_URL = "https://efficient-raccoon-976.convex.cloud";
++export const CONVEX_URL = import.meta.env.VITE_CONVEX_URL || "https://efficient-raccoon-976.convex.cloud";
+
+ export const convex = new ConvexHttpClient(CONVEX_URL);
+ export { api };
