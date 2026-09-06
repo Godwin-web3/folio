@@ -71,6 +71,22 @@ function filterMatched(
   return { kept, skipped };
 }
 
+function shortDate(value: string | undefined | null): string {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function cleanTitle(
+  status: string | undefined | null,
+  description: string | undefined | null,
+  date: string | undefined | null,
+): string {
+  const st = (status ?? "").trim() || "STATUS";
+  const desc = (description ?? "").trim().replace(/\s+/g, " ").slice(0, 72);
+  const day = shortDate(date);
+  return [st, desc, day].filter(Boolean).join(" · ");
+}
+
 export const crawlBuilding = action({
   args: { userId: v.string(), fileId: v.id("addressFiles") },
   handler: async (ctx, { userId, fileId }) => {
@@ -128,34 +144,59 @@ export const crawlBuilding = action({
     const licFiltered = filterMatched(street, licenses);
 
     const crawled: Crawled[] = [];
-    for (const v of violFiltered.kept) {
+    const licensesPublicUrl =
+      "https://data.cityofchicago.org/Community-Economic-Development/Business-Licenses/r5kz-chrr";
+    for (const v of violFiltered.kept.slice(0, 12)) {
+      const description = String(v.violation_description ?? "").trim();
+      const ordinance = String(v.violation_ordinance ?? "").trim();
+      if (!description && !ordinance) continue;
+      const day = shortDate(v.violation_date);
       crawled.push({
-        agency: "Chicago Buildings",
+        agency: "Chicago Department of Buildings",
         kind: "violation",
-        title: `${v.violation_status ?? "STATUS"} · ${v.violation_description ?? "Violation"}`,
+        title: cleanTitle(
+          v.violation_status,
+          description || ordinance || "Violation",
+          day,
+        ),
         url: COOK.buildingsUrl,
         extracted: {
           status: v.violation_status ?? "",
-          date: v.violation_date ?? "",
+          date: day,
+          shortDate: day,
           address: v.address ?? "",
           matchScore: Number(v._matchScore ?? 0),
           matchReason: v._matchReason ?? "",
           threshold: MATCH_ACCEPT_THRESHOLD,
+          exhibitReady: true,
+          source: "chicago-soda-building-violations",
         },
-        rawExcerpt: String(v.violation_ordinance ?? "").slice(0, 500),
+        rawExcerpt: ordinance.slice(0, 500) || description.slice(0, 500),
       });
     }
-    for (const lic of licFiltered.kept) {
+    for (const lic of licFiltered.kept.slice(0, 6)) {
+      const day = shortDate(lic.date_issued);
+      const dba = String(
+        lic.doing_business_as_name ?? lic.legal_name ?? "",
+      ).trim();
       crawled.push({
-        agency: "Chicago Business Affairs",
+        agency: "Chicago Business Affairs & Consumer Protection",
         kind: "license",
-        title: `${lic.license_description ?? "License"} · ${lic.doing_business_as_name ?? ""}`,
-        url: COOK.licensesApi,
+        title: cleanTitle(
+          lic.license_status,
+          (lic.license_description ?? dba) || "License",
+          day,
+        ),
+        url: licensesPublicUrl,
         extracted: {
           status: lic.license_status ?? "",
+          date: day,
+          shortDate: day,
           address: lic.address ?? "",
           matchScore: Number(lic._matchScore ?? 0),
           matchReason: lic._matchReason ?? "",
+          exhibitReady: true,
+          source: "chicago-soda-business-licenses",
         },
         rawExcerpt: String(lic.legal_name ?? ""),
       });
