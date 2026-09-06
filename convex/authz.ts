@@ -2,13 +2,15 @@
  * Fail-closed auth helpers for Convex.
  *
  * Prefer Convex Auth identity (`ctx.auth.getUserIdentity()`). When identity is
- * present, client-supplied userId must match (or may be omitted). When identity
- * is absent (deployment without Convex Auth), we still require a non-empty
- * claimed userId and enforce ownership on every file access — but a client can
- * spoof that claim until Convex Auth (or a server-minted proof) is enabled.
+ * present, client-supplied userId must match (or may be omitted).
  *
- * Watch links (`watchKey`) are share-by-link READ ONLY. Mutations never accept
- * watchKey; strangers with a link cannot write or mutate.
+ * Product path: require identity for file mutations and ownership-sensitive
+ * queries (fail closed with Unauthorized). Watch-key reads stay unauthenticated
+ * by design (`files.getByWatch`).
+ *
+ * Optional escape hatch: set Convex dashboard env `ALLOW_CLAIMED_USERID=true`
+ * to accept a non-empty client-claimed userId when identity is absent (local
+ * demos only). Default / absent = require identity.
  */
 
 type AuthCtx = {
@@ -24,7 +26,24 @@ type DbCtx = {
   };
 };
 
-/** Resolve the caller user id — identity wins over client claim. */
+/** Transitional local-demo escape hatch. Default OFF. */
+export function allowClaimedUserId(
+  env: { ALLOW_CLAIMED_USERID?: string } = process.env,
+): boolean {
+  const v = env.ALLOW_CLAIMED_USERID;
+  return v === "1" || v === "true";
+}
+
+/** Normalize a client-claimed user id; null if empty/too long. */
+export function normalizeClaimedUserId(
+  claimedUserId: string | undefined,
+): string | null {
+  const id = (claimedUserId ?? "").trim();
+  if (!id || id.length > 320) return null;
+  return id;
+}
+
+/** Resolve the caller user id — identity wins; claim only if explicitly allowed. */
 export async function resolveUserId(
   ctx: AuthCtx,
   claimedUserId: string | undefined,
@@ -36,8 +55,11 @@ export async function resolveUserId(
     }
     return identity.subject;
   }
-  const id = (claimedUserId ?? "").trim();
-  if (!id || id.length > 320) {
+  if (!allowClaimedUserId()) {
+    throw new Error("Unauthorized");
+  }
+  const id = normalizeClaimedUserId(claimedUserId);
+  if (!id) {
     throw new Error("Unauthorized");
   }
   return id;

@@ -9,6 +9,7 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as auth from "../auth.js";
 import type * as building from "../building.js";
 import type * as buildingStore from "../buildingStore.js";
 import type * as demo from "../demo.js";
@@ -19,6 +20,7 @@ import type * as lib from "../lib.js";
 import type * as mail from "../mail.js";
 import type * as open from "../open.js";
 import type * as photo from "../photo.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +30,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  auth: typeof auth;
   building: typeof building;
   buildingStore: typeof buildingStore;
   demo: typeof demo;
@@ -38,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   mail: typeof mail;
   open: typeof open;
   photo: typeof photo;
+  users: typeof users;
 }>;
 
 /**
