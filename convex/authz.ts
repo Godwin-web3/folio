@@ -47,9 +47,8 @@ export async function resolveUserId(
 ): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
   if (identity?.subject) {
-    if (claimedUserId && claimedUserId !== identity.subject) {
-      throw new Error("Unauthorized");
-    }
+    // When Convex Auth is present, the server identity is authoritative.
+    // Do not reject client-supplied ids that differ in formatting — ignore them.
     return identity.subject;
   }
   if (!allowClaimedUserId()) {
