@@ -64,7 +64,8 @@ export function useFolioSession(): {
     };
   }
 
-  if (user) {
+  const folioSpa = import.meta.env.VITE_FOLIO_SPA === "1";
+  if (user && !folioSpa) {
     return {
       session: {
         userId: user.id,
