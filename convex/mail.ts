@@ -56,6 +56,15 @@ async function insertInbound(
     status: "received",
     relatedClaimId,
   });
+  if (relatedClaimId && args.promiseOn) {
+    await ctx.db.insert("timelineEvents", {
+      fileId: args.fileId,
+      userId: file.userId,
+      kind: "claim",
+      title: `Claim stamped · ${args.promiseOn}`,
+      detail: args.summary,
+    });
+  }
   await ctx.db.patch(args.fileId, {
     status: nextStatus(file.status, "answered"),
   });
