@@ -23,6 +23,8 @@
     "deploy:site": "npx @convex-dev/static-hosting deploy --dist dist --build-command \"npm run build:spa\""
   },
   "dependencies": {
+    "@auth/core": "^0.41.1",
+    "@convex-dev/auth": "^0.0.95",
     "@convex-dev/static-hosting": "^0.2.1",
     "@electric-sql/pglite": "^0.5.4",
     "@hookform/resolvers": "^5.7.0",
