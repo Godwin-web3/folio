@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { action, mutation } from "./_generated/server";
 import { api } from "./_generated/api";
-import { resolveUserId } from "./authz";
+import { requireFile, resolveUserId } from "./authz";
 import { parseNoticeFromImage, parseNoticeFromText } from "./lib/noticeParse";
 
 export const generateUploadUrl = mutation({
@@ -51,6 +51,7 @@ export const parseNoticePhoto = action({
       reason: parsed.reason,
       rawText: parsed.rawText,
       source: `photo:${via}`,
+      storageId,
     });
     return { ...parsed, via };
   },
@@ -80,5 +81,57 @@ export const parseNoticeText = action({
       source: `typed:${via}`,
     });
     return { ...parsed, via };
+  },
+});
+
+/**
+ * Attach proof-of-service photo to the latest notice (or create served fields).
+ * Timeline: "Proof of service filed".
+ */
+export const attachProofOfService = mutation({
+  args: {
+    userId: v.string(),
+    fileId: v.id("addressFiles"),
+    storageId: v.id("_storage"),
+    servedMethod: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId: claimed, fileId, storageId, servedMethod }) => {
+    const userId = await resolveUserId(ctx, claimed);
+    const file = await requireFile(ctx, fileId, userId);
+    const notices = await ctx.db
+      .query("notices")
+      .withIndex("by_file", (q) => q.eq("fileId", fileId))
+      .collect();
+    const latest = notices.at(-1);
+    const method = (servedMethod ?? "door_posting").trim() || "door_posting";
+    const servedAt = Date.now();
+    if (latest) {
+      await ctx.db.patch(latest._id, {
+        servedPhotoStorageId: storageId,
+        servedAt,
+        servedMethod: method,
+      });
+    } else {
+      await ctx.db.insert("notices", {
+        fileId,
+        userId: file.userId,
+        noticeType: "proof_of_service",
+        plaintiff: "",
+        reason: "Proof of service only",
+        rawText: "",
+        source: "proof",
+        servedPhotoStorageId: storageId,
+        servedAt,
+        servedMethod: method,
+      });
+    }
+    await ctx.db.insert("timelineEvents", {
+      fileId,
+      userId: file.userId,
+      kind: "service",
+      title: "Proof of service filed",
+      detail: method,
+    });
+    return null;
   },
 });
