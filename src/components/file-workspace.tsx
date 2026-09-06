@@ -5,7 +5,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { api, asFileId, asMessageId, asStorageId, mapBundle } from "@/lib/open-address/convex-client";
-import { ingestNotice, logReply } from "@/lib/open-address/data";
+import { logReply } from "@/lib/open-address/data";
 import { compressNoticePhoto } from "@/lib/open-address/compress-image";
 import { watchHref } from "@/lib/open-address/watch-url";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
@@ -57,6 +57,7 @@ function FileShell({
   const friday = useAction(api.mail.stampFriday);
   const uploadUrl = useMutation(api.photo.generateUploadUrl);
   const parsePhoto = useAction(api.photo.parseNoticePhoto);
+  const parseText = useAction(api.photo.parseNoticeText);
   const ensureWatch = useMutation(api.files.ensureWatchKey);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,14 +107,18 @@ function FileShell({
             setNoticeText={setNoticeText}
             onIngest={() =>
               void run("notice", async () => {
-                await ingestNotice(userId, fileId, noticeText);
+                await parseText({
+                  userId,
+                  fileId: asFileId(fileId),
+                  rawText: noticeText,
+                });
                 setNoticeText("");
               })
             }
             onPhoto={(file) =>
               void run("photo", async () => {
                 const blob = await compressNoticePhoto(file);
-                const url = await uploadUrl({});
+                const url = await uploadUrl({ userId });
                 const posted = await fetch(url, {
                   method: "POST",
                   headers: { "Content-Type": blob.type || "image/jpeg" },
@@ -213,6 +218,14 @@ function FileShell({
   );
 }
 
+
+function noticeSourceLabel(source: string) {
+  if (source.startsWith("photo:")) return "from photo";
+  if (source.startsWith("typed:")) return "typed in";
+  if (source === "paste") return "typed in";
+  return source;
+}
+
 function NoticeScreen({
   bundle,
   busy,
@@ -235,6 +248,9 @@ function NoticeScreen({
   const notice = bundle.notices[0];
   const violations = bundle.records.filter((r) => r.kind === "violation");
   const ready = Boolean(notice) && violations.length > 0;
+  const [mode, setMode] = useState<"choose" | "snap" | "type">(
+    notice ? "choose" : "choose",
+  );
 
   return (
     <div className="space-y-8">
@@ -244,6 +260,7 @@ function NoticeScreen({
           <div className="folio-card px-5 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stamp">
               On file
+              {notice.source ? ` · ${noticeSourceLabel(notice.source)}` : ""}
             </p>
             <p className="mt-1 font-serif text-2xl leading-none">
               {statusLabel(notice.notice_type)}
@@ -253,40 +270,113 @@ function NoticeScreen({
               {formatDay(notice.deadline_on)}
               {notice.plaintiff ? ` · ${notice.plaintiff}` : ""}
             </p>
+            {notice.amount_cents != null ? (
+              <p className="mt-1 text-sm font-medium">
+                ${(notice.amount_cents / 100).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            ) : null}
+            {notice.raw_text ? (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-muted">
+                  Notice text
+                </summary>
+                <p className="mt-2 whitespace-pre-wrap font-serif text-sm leading-relaxed text-ink">
+                  {notice.raw_text}
+                </p>
+              </details>
+            ) : null}
           </div>
         ) : (
           <>
-            <label className="folio-btn cursor-pointer">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="sr-only"
+            <p className="text-sm leading-relaxed text-muted">
+              Get the deadline on the file. Snap the paper on the door, or type
+              what it says — same structured notice either way.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={
+                  mode === "snap"
+                    ? "folio-btn"
+                    : "folio-btn-ghost"
+                }
                 disabled={busy !== null}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onPhoto(file);
-                  e.target.value = "";
-                }}
-              />
-              {busy === "photo" ? "Reading the paper…" : "Photograph the paper on the door"}
-            </label>
-            <p className="text-center text-xs text-muted">or paste the words</p>
-            <textarea
-              className="folio-input min-h-40 font-serif"
-              value={noticeText}
-              onChange={(e) => setNoticeText(e.target.value)}
-              placeholder="Paste the notice, word for word."
-              aria-label="Notice text"
-            />
-            <button
-              type="button"
-              disabled={busy !== null || noticeText.trim().length < 20}
-              onClick={onIngest}
-              className="folio-btn"
-            >
-              {busy === "notice" ? "Filing…" : "File this notice"}
-            </button>
+                onClick={() => setMode("snap")}
+              >
+                Snap photo
+              </button>
+              <button
+                type="button"
+                className={
+                  mode === "type"
+                    ? "folio-btn"
+                    : "folio-btn-ghost"
+                }
+                disabled={busy !== null}
+                onClick={() => setMode("type")}
+              >
+                Type it in
+              </button>
+            </div>
+
+            {mode === "snap" ? (
+              <div className="folio-card space-y-3 px-5 py-4">
+                <p className="text-sm text-muted">
+                  Use the camera or pick a photo. Folio reads the deadline,
+                  landlord, and amount with OpenAI vision.
+                </p>
+                <label className="folio-btn cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="sr-only"
+                    disabled={busy !== null}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onPhoto(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  {busy === "photo"
+                    ? "Reading the paper…"
+                    : "Take or choose photo"}
+                </label>
+              </div>
+            ) : null}
+
+            {mode === "type" ? (
+              <div className="folio-card space-y-3 px-5 py-4">
+                <p className="text-sm text-muted">
+                  Paste or type the notice word for word. Folio extracts the
+                  deadline and parties (OpenAI when configured).
+                </p>
+                <textarea
+                  className="folio-input min-h-40 font-serif"
+                  value={noticeText}
+                  onChange={(e) => setNoticeText(e.target.value)}
+                  placeholder={"FIVE DAY NOTICE…\nLANDLORD: …\nAmount due: $…"}
+                  aria-label="Notice text"
+                />
+                <button
+                  type="button"
+                  disabled={busy !== null || noticeText.trim().length < 20}
+                  onClick={onIngest}
+                  className="folio-btn"
+                >
+                  {busy === "notice" ? "Filing…" : "File this notice"}
+                </button>
+              </div>
+            ) : null}
+
+            {mode === "choose" ? (
+              <p className="text-center text-xs text-muted">
+                Pick Snap or Type to continue.
+              </p>
+            ) : null}
           </>
         )}
       </section>
@@ -309,29 +399,24 @@ function NoticeScreen({
             to your notice so the letter is not just your word.
           </p>
         ) : (
-          <ol className="folio-card divide-y divide-rule overflow-hidden">
-            {violations.map((r, i) => (
-              <li key={r.id} className="flex gap-3 px-3 py-3">
-                <span className="w-6 shrink-0 font-serif text-lg tabular-nums text-stamp">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span>
-                  <span className="block text-sm leading-snug">{r.title.replace(/^OPEN · /i, "")}</span>
-                  <span className="text-xs text-muted">Open · Chicago Buildings</span>
-                </span>
+          <ul className="space-y-2">
+            {violations.slice(0, 8).map((r) => (
+              <li key={r.id} className="folio-card px-4 py-3 text-sm">
+                <p className="font-medium leading-snug">{r.title}</p>
+                <p className="mt-1 text-xs text-muted">{r.agency}</p>
               </li>
             ))}
-          </ol>
+          </ul>
         )}
       </section>
 
       <button
         type="button"
-        disabled={!ready}
+        disabled={!ready || busy !== null}
         onClick={onNext}
-        className="fixed inset-x-0 bottom-0 z-10 min-h-14 bg-filed text-sm font-semibold text-paper disabled:bg-rule sm:static sm:w-full sm:rounded-full"
+        className="folio-btn"
       >
-        Write the letter
+        Continue to the letter
       </button>
     </div>
   );
