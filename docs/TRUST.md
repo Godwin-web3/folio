@@ -85,3 +85,19 @@ Owners can call `files.revokeWatchKey` to clear `watchKey`. Old share links
 stop resolving via `getByWatch`. A timeline event `Watch link revoked` is
 recorded when a key was present.
 
+
+## Level-up surfaces (schema + API)
+
+Optional fields keep existing files working.
+
+| Surface | Schema | API | UI |
+| --- | --- | --- | --- |
+| Notice photos / proof of service | `notices.storageId`, `servedPhotoStorageId`, `servedAt`, `servedMethod` | `photo.parseNoticePhoto` passes `storageId`; `photo.attachProofOfService` | Notice step: thumbnail + Proof of service upload |
+| Rent ledger | `ledgerEntries` | `ledger.list`, `ledger.addEntry`; notice amounts auto-insert `kind: notice` | Packet step: list + add charge/payment |
+| RLTO checklist | `checklistItems` | `checklist.seedRlto`, `setStatus`, `list` | Letters step: Load Chicago checklist toggles |
+| Court case # | `addressFiles.courtCaseNumber` | `court.setCourtCaseNumber` | Packet step field |
+| Deadline reminders | `reminders` (+ cron) | `reminders.schedule` / `scheduleForFile`; daily `reminders.processDue` via AgentMail email only (no SMS) | Scheduled on notice deadline ingest |
+| Export pack | — | `exportPack.build` action (JSON + storage URLs) | Packet: Export pack button |
+| Jurisdiction | `jurisdictionLabel`; `lib/jurisdictions` COOK + NYC stub | `jurisdictions.list` | Packet chip “Cook County · Chicago (wedge)” |
+
+All mutations fail closed via `resolveUserId` + `requireFile`.
