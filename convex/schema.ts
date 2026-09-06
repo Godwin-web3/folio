@@ -21,7 +21,11 @@ export default defineSchema({
     .index("by_inbox", ["caseInbox"])
     .index("by_mail_inbox", ["mailInboxId"])
     .index("by_user_demo", ["userId", "demoKey"])
-    .index("by_watch", ["watchKey"]),
+    .index("by_watch", ["watchKey"])
+    .searchIndex("search_street", {
+      searchField: "street",
+      filterFields: ["userId"]
+    }),
 
   fileMembers: defineTable({
     fileId: v.id("addressFiles"),
