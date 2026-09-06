@@ -19,6 +19,8 @@ export type AddressFile = {
   state: string;
   zip: string;
   jurisdiction: string;
+  jurisdiction_label: string | null;
+  court_case_number: string | null;
   status: FileStatus;
   case_inbox: string;
   mail_inbox_id: string | null;
@@ -52,6 +54,10 @@ export type Notice = {
   reason: string;
   raw_text: string;
   source: string;
+  notice_photo_url: string | null;
+  proof_photo_url: string | null;
+  served_method: string | null;
+  served_at: string | null;
   created_at: string;
 };
 
@@ -122,6 +128,31 @@ export type Exhibit = {
   source_table: string;
   source_id: string;
   body: string;
+  storage_id: string | null;
+  created_at: string;
+};
+
+export type LedgerEntry = {
+  id: string;
+  file_id: string;
+  user_id: string;
+  kind: string;
+  amount_cents: number;
+  note: string;
+  occurred_on: string;
+  related_notice_id: string | null;
+  created_at: string;
+};
+
+export type ChecklistItem = {
+  id: string;
+  file_id: string;
+  user_id: string;
+  code: string;
+  title: string;
+  detail: string;
+  status: string;
+  source: string;
   created_at: string;
 };
 
@@ -157,6 +188,8 @@ export type FileBundle = {
   exhibits: Exhibit[];
   deadlines: Deadline[];
   events: TimelineEvent[];
+  ledger: LedgerEntry[];
+  checklist: ChecklistItem[];
 };
 
 export type NoticeParse = {
