@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { api, mapFile } from "@/lib/open-address/convex-client";
 import { openFile } from "@/lib/open-address/data";
@@ -31,9 +31,15 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const allCards = useQuery(api.files.listCards, { userId });
-  const searchedCards = useQuery(api.files.searchCards,
-    searchQuery ? { userId, searchQuery } : "skip"
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const queryReady = isAuthenticated && !authLoading && Boolean(userId);
+  const allCards = useQuery(
+    api.files.listCards,
+    queryReady ? { userId } : "skip",
+  );
+  const searchedCards = useQuery(
+    api.files.searchCards,
+    queryReady && searchQuery ? { userId, searchQuery } : "skip",
   );
   const rawCards = searchQuery ? searchedCards : allCards;
 
@@ -107,7 +113,7 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
     }
   }
 
-  if (rawCards === undefined) {
+  if (!queryReady || rawCards === undefined) {
     return <div className="min-h-screen bg-paper p-6 text-muted">Opening…</div>;
   }
 
