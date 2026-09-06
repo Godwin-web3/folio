@@ -11,6 +11,7 @@ import { watchHref } from "@/lib/open-address/watch-url";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
+  deadlineCopy,
   formatDay,
   statusLabel,
   type FileStep,
@@ -60,6 +61,12 @@ function FileShell({
   const parseText = useAction(api.photo.parseNoticeText);
   const ensureWatch = useMutation(api.files.ensureWatchKey);
   const revokeWatch = useMutation(api.files.revokeWatchKey);
+  const attachProof = useMutation(api.photo.attachProofOfService);
+  const addLedger = useMutation(api.ledger.addEntry);
+  const seedChecklist = useMutation(api.checklist.seedRlto);
+  const setChecklistStatus = useMutation(api.checklist.setStatus);
+  const setCourtCase = useMutation(api.court.setCourtCaseNumber);
+  const exportPack = useAction(api.exportPack.build);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noticeText, setNoticeText] = useState("");
@@ -174,6 +181,25 @@ function FileShell({
                 });
               })
             }
+            onProof={(file) =>
+              void run("proof", async () => {
+                const blob = await compressNoticePhoto(file);
+                const url = await uploadUrl({ userId });
+                const posted = await fetch(url, {
+                  method: "POST",
+                  headers: { "Content-Type": blob.type || "image/jpeg" },
+                  body: blob,
+                });
+                if (!posted.ok) throw new Error("Photo did not upload");
+                const { storageId } = (await posted.json()) as { storageId: string };
+                await attachProof({
+                  userId,
+                  fileId: asFileId(fileId),
+                  storageId: asStorageId(storageId),
+                  servedMethod: "door_posting",
+                });
+              })
+            }
             onCrawl={() =>
               void run("crawl", async () => {
                 await crawl({ userId, fileId: asFileId(fileId) });
@@ -226,6 +252,20 @@ function FileShell({
                 await friday({ userId, fileId: asFileId(fileId) });
               })
             }
+            onSeedChecklist={() =>
+              void run("checklist", async () => {
+                await seedChecklist({ userId, fileId: asFileId(fileId) });
+              })
+            }
+            onChecklistStatus={(itemId, status) =>
+              void run("checklist-status", async () => {
+                await setChecklistStatus({
+                  userId,
+                  itemId: itemId as any,
+                  status,
+                });
+              })
+            }
             onNext={() =>
               void navigate({
                 to: "/file/$fileId",
@@ -261,6 +301,44 @@ function FileShell({
                 });
               })
             }
+            onAddLedger={(kind, amountCents, note) =>
+              void run("ledger", async () => {
+                await addLedger({
+                  userId,
+                  fileId: asFileId(fileId),
+                  kind,
+                  amountCents,
+                  note,
+                });
+              })
+            }
+            onCourtCase={(courtCaseNumber) =>
+              void run("court", async () => {
+                await setCourtCase({
+                  userId,
+                  fileId: asFileId(fileId),
+                  courtCaseNumber,
+                });
+              })
+            }
+            onExport={() =>
+              void run("export", async () => {
+                const packJson = await exportPack({
+                  userId,
+                  fileId: asFileId(fileId),
+                });
+                const blob = new Blob([JSON.stringify(packJson, null, 2)], {
+                  type: "application/json",
+                });
+                const href = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = href;
+                a.download = `folio-pack-${fileId}.json`;
+                a.click();
+                URL.revokeObjectURL(href);
+                window.setTimeout(() => window.print(), 400);
+              })
+            }
           />
         ) : null}
       </main>
@@ -283,6 +361,7 @@ function NoticeScreen({
   setNoticeText,
   onIngest,
   onPhoto,
+  onProof,
   onCrawl,
   onNext,
 }: {
@@ -292,6 +371,7 @@ function NoticeScreen({
   setNoticeText: (v: string) => void;
   onIngest: () => void;
   onPhoto: (file: File) => void;
+  onProof: (file: File) => void;
   onCrawl: () => void;
   onNext: () => void;
 }) {
@@ -315,6 +395,11 @@ function NoticeScreen({
             <p className="mt-1 font-serif text-2xl leading-none">
               {statusLabel(notice.notice_type)}
             </p>
+            {notice.deadline_on ? (
+              <p className="mt-2 font-serif text-lg text-stamp">
+                {deadlineCopy(notice.deadline_on) ?? formatDay(notice.deadline_on)}
+              </p>
+            ) : null}
             <p className="mt-2 text-sm text-muted">
               Served {formatDay(notice.served_on)} · due{" "}
               {formatDay(notice.deadline_on)}
@@ -328,6 +413,35 @@ function NoticeScreen({
                 })}
               </p>
             ) : null}
+            {notice.notice_photo_url ? (
+              <img
+                src={notice.notice_photo_url}
+                alt="Notice on file"
+                className="mt-3 max-h-40 rounded-xl object-cover"
+              />
+            ) : null}
+            {notice.proof_photo_url ? (
+              <img
+                src={notice.proof_photo_url}
+                alt="Proof of service"
+                className="mt-2 max-h-32 rounded-xl object-cover"
+              />
+            ) : null}
+            <label className="folio-btn-ghost mt-3 inline-flex cursor-pointer text-sm">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                disabled={busy !== null}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onProof(file);
+                  e.target.value = "";
+                }}
+              />
+              {busy === "proof" ? "Filing proof…" : "Proof of service"}
+            </label>
             {notice.raw_text ? (
               <details className="mt-3">
                 <summary className="cursor-pointer text-xs text-muted">
@@ -443,6 +557,9 @@ function NoticeScreen({
             {busy === "crawl" ? "Pulling…" : violations.length ? "Refresh" : "Pull Chicago"}
           </button>
         </div>
+        <p className="rounded-2xl bg-chip px-3 py-2 text-xs leading-relaxed text-ink">
+          Building-level city records — confirm they match your unit.
+        </p>
         {violations.length === 0 ? (
           <p className="text-sm leading-relaxed text-muted">
             Inspectors already write this building up. Folio puts that list next
@@ -482,6 +599,8 @@ function LettersScreen({
   onSend,
   onInbound,
   onFriday,
+  onSeedChecklist,
+  onChecklistStatus,
   onNext,
 }: {
   bundle: FileBundle;
@@ -493,6 +612,8 @@ function LettersScreen({
   onSend: (id: string) => void;
   onInbound: () => void;
   onFriday: () => void;
+  onSeedChecklist: () => void;
+  onChecklistStatus: (itemId: string, status: string) => void;
   onNext: () => void;
 }) {
   const demand = bundle.messages.find((m) => m.classification === "demand");
@@ -501,6 +622,49 @@ function LettersScreen({
 
   return (
     <div className="space-y-8">
+      <section className="space-y-3">
+        <h3 className="font-serif text-xl">Chicago RLTO checklist</h3>
+        <p className="text-sm leading-relaxed text-muted">
+          Prompts only — not legal advice. Flag what may matter for your file.
+        </p>
+        {bundle.checklist.length === 0 ? (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={onSeedChecklist}
+            className="folio-btn-ghost w-full"
+          >
+            {busy === "checklist" ? "Loading…" : "Load Chicago checklist"}
+          </button>
+        ) : (
+          <ul className="space-y-2">
+            {bundle.checklist.map((item) => (
+              <li key={item.id} className="folio-card px-4 py-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium leading-snug">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted">{item.detail}</p>
+                  </div>
+                  <select
+                    className="folio-input max-w-[7.5rem] shrink-0 py-1 text-xs"
+                    value={item.status}
+                    disabled={busy !== null}
+                    aria-label={`Status for ${item.title}`}
+                    onChange={(e) =>
+                      onChecklistStatus(item.id, e.target.value)
+                    }
+                  >
+                    <option value="open">Open</option>
+                    <option value="flagged">Flagged</option>
+                    <option value="cleared">Cleared</option>
+                    <option value="na">N/A</option>
+                  </select>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <section className="space-y-3">
         <h3 className="font-serif text-xl">The letter</h3>
         <p className="text-sm leading-relaxed text-muted">
@@ -645,23 +809,144 @@ function PacketScreen({
   onPacket,
   onWatch,
   onRevokeWatch,
+  onAddLedger,
+  onCourtCase,
+  onExport,
 }: {
   bundle: FileBundle;
   busy: string | null;
   onPacket: () => void;
   onWatch: () => Promise<string>;
   onRevokeWatch: () => void;
+  onAddLedger: (kind: string, amountCents: number, note: string) => void;
+  onCourtCase: (courtCaseNumber: string) => void;
+  onExport: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [caseNo, setCaseNo] = useState(bundle.file.court_case_number ?? "");
+  const [ledgerKind, setLedgerKind] = useState("charge");
+  const [ledgerAmount, setLedgerAmount] = useState("");
+  const [ledgerNote, setLedgerNote] = useState("");
+  const balance = bundle.ledger.reduce((sum, row) => {
+    if (row.kind === "payment") return sum - Math.abs(row.amount_cents);
+    return sum + row.amount_cents;
+  }, 0);
+
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="font-serif text-xl">What you can hand someone</h3>
+        <p className="inline-flex rounded-full bg-chip px-3 py-1 text-xs font-semibold text-filed">
+          {bundle.file.jurisdiction_label ?? "Cook County · Chicago (wedge)"}
+        </p>
+        <h3 className="mt-3 font-serif text-xl">What you can hand someone</h3>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Exhibit A the notice. Exhibit B Chicago’s list. Exhibit C the day they
           named. Print copies. Legal aid watches the live file.
         </p>
       </section>
+
+      <section className="folio-card space-y-3 px-4 py-4">
+        <h4 className="font-serif text-lg">Court case number</h4>
+        <div className="flex gap-2">
+          <input
+            className="folio-input flex-1"
+            value={caseNo}
+            onChange={(e) => setCaseNo(e.target.value)}
+            placeholder="e.g. 2026-M1-123456"
+            aria-label="Court case number"
+          />
+          <button
+            type="button"
+            disabled={busy !== null}
+            className="folio-btn-ghost shrink-0"
+            onClick={() => onCourtCase(caseNo)}
+          >
+            {busy === "court" ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h4 className="font-serif text-lg">Rent ledger</h4>
+        <p className="text-xs text-muted">
+          Balance on file: $
+          {(balance / 100).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </p>
+        {bundle.ledger.length ? (
+          <ul className="folio-card divide-y divide-rule overflow-hidden">
+            {bundle.ledger.map((row) => (
+              <li
+                key={row.id}
+                className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
+              >
+                <span>
+                  <span className="font-medium capitalize">{row.kind}</span>
+                  {row.note ? (
+                    <span className="text-muted"> · {row.note}</span>
+                  ) : null}
+                  <span className="block text-xs text-muted">
+                    {formatDay(row.occurred_on)}
+                  </span>
+                </span>
+                <span className="font-serif">
+                  {(row.kind === "payment" ? "-" : "") +
+                    "$" +
+                    (Math.abs(row.amount_cents) / 100).toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">No ledger rows yet.</p>
+        )}
+        <div className="folio-card space-y-2 px-4 py-3">
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              className="folio-input"
+              value={ledgerKind}
+              onChange={(e) => setLedgerKind(e.target.value)}
+              aria-label="Ledger kind"
+            >
+              <option value="charge">Charge</option>
+              <option value="payment">Payment</option>
+              <option value="adjustment">Adjustment</option>
+            </select>
+            <input
+              className="folio-input"
+              inputMode="decimal"
+              placeholder="Amount $"
+              value={ledgerAmount}
+              onChange={(e) => setLedgerAmount(e.target.value)}
+              aria-label="Ledger amount dollars"
+            />
+          </div>
+          <input
+            className="folio-input"
+            placeholder="Note"
+            value={ledgerNote}
+            onChange={(e) => setLedgerNote(e.target.value)}
+            aria-label="Ledger note"
+          />
+          <button
+            type="button"
+            className="folio-btn-ghost w-full"
+            disabled={busy !== null || !ledgerAmount.trim()}
+            onClick={() => {
+              const dollars = Number(ledgerAmount);
+              if (!Number.isFinite(dollars)) return;
+              onAddLedger(ledgerKind, Math.round(dollars * 100), ledgerNote);
+              setLedgerAmount("");
+              setLedgerNote("");
+            }}
+          >
+            {busy === "ledger" ? "Saving…" : "Add ledger entry"}
+          </button>
+        </div>
+      </section>
+
       <button
         type="button"
         disabled={busy !== null}
@@ -722,6 +1007,14 @@ function PacketScreen({
           Print / save PDF
         </Link>
       ) : null}
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={onExport}
+        className="folio-btn-ghost w-full"
+      >
+        {busy === "export" ? "Preparing…" : "Export pack (JSON + print)"}
+      </button>
       <p className="text-xs leading-relaxed text-muted">
         Folio is a written record for {COOK.court}. It is not a lawyer and does
         not file in court.
