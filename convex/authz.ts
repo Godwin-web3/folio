@@ -20,10 +20,7 @@ type AuthCtx = {
 };
 
 type DbCtx = {
-  db: {
-    get: (id: any) => Promise<any>;
-    query: (table: string) => any;
-  };
+  db: any;
 };
 
 /** Transitional local-demo escape hatch. Default OFF. */
