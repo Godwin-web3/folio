@@ -5,7 +5,13 @@ import type { FileBundle } from "@/lib/open-address/types";
 import { casePulse, formatDay } from "@/lib/open-address/flow";
 import { BuildingMark, ClockMark, StampMark } from "@/components/marks";
 
-export function CaseFace({ bundle }: { bundle: FileBundle }) {
+export function CaseFace({
+  bundle,
+  flashPromise,
+}: {
+  bundle: FileBundle;
+  flashPromise?: boolean;
+}) {
   const pulse = casePulse(bundle);
   return (
     <section className="px-4 pt-4">
@@ -41,6 +47,9 @@ export function CaseFace({ bundle }: { bundle: FileBundle }) {
                 : "None"
             }
             hot={Boolean(pulse.promise)}
+            className={
+              flashPromise && pulse.promise ? "folio-claim-flash" : undefined
+            }
           />
         </ul>
       </div>
@@ -53,17 +62,19 @@ function PulseCell({
   label,
   value,
   hot,
+  className,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   hot?: boolean;
+  className?: string;
 }) {
   return (
     <li
       className={`rounded-2xl px-2.5 py-3 ${
         hot ? "bg-chip" : "bg-paper"
-      }`}
+      }${className ? ` ${className}` : ""}`}
     >
       <div className="flex items-center gap-1.5 text-muted">{icon}</div>
       <p className="mt-2 text-[10px] font-semibold uppercase tracking-widest text-muted">
