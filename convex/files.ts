@@ -9,6 +9,7 @@ import { requireFile, resolveUserId } from "./authz";
  * - `getByWatch` is the only public entry that accepts watchKey.
  * - Mutations never accept watchKey; strangers cannot write, ingest, send mail,
  *   replace records, or change status via a watch link alone.
+ * - Owners revoke via `revokeWatchKey` (clears watchKey; old links stop working).
  */
 
 function newWatchKey() {
@@ -110,6 +111,25 @@ export const ensureWatchKey = mutation({
     const watchKey = newWatchKey();
     await ctx.db.patch(fileId, { watchKey });
     return watchKey;
+  },
+});
+
+export const revokeWatchKey = mutation({
+  args: { userId: v.string(), fileId: v.id("addressFiles") },
+  handler: async (ctx, { userId: claimed, fileId }) => {
+    const userId = await resolveUserId(ctx, claimed);
+    const file = await requireFile(ctx, fileId, userId);
+    if (file.watchKey) {
+      await ctx.db.patch(fileId, { watchKey: undefined });
+      await ctx.db.insert("timelineEvents", {
+        fileId,
+        userId: file.userId,
+        kind: "watch",
+        title: "Watch link revoked",
+        detail: "",
+      });
+    }
+    return null;
   },
 });
 
