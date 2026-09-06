@@ -33,17 +33,23 @@ export function AppHeader({
 }
 
 function FolioAccount() {
-  const { session, signOutGuest } = useFolioSession();
+  const { session, signOutGuest, signOut } = useFolioSession();
   if (!session) return <UserButton />;
+  // Better Auth chip when that stack owns the session.
   if (session.kind === "auth") return <UserButton />;
+  // Convex Auth (and guest) — render from Folio session identity.
   return (
     <div className="flex items-center gap-2">
       <span className="grid h-9 w-9 place-items-center rounded-full bg-chip text-sm font-semibold">
         {session.name.charAt(0).toUpperCase()}
       </span>
+      <span className="hidden text-sm font-medium sm:inline">{session.name}</span>
       <button
         type="button"
-        onClick={signOutGuest}
+        onClick={() => {
+          if (session.kind === "guest") signOutGuest();
+          else void signOut();
+        }}
         className="text-xs font-medium text-muted"
       >
         Sign out

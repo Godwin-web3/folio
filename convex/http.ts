@@ -4,8 +4,12 @@ import { internal, components } from "./_generated/api";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { extractInboundPromise } from "./lib/promiseExtract";
 import { todayIso } from "./lib";
+import { auth } from "./auth";
 
 const http = httpRouter();
+
+// Convex Auth HTTP routes (sign-in callbacks, JWKS, etc.)
+auth.addHttpRoutes(http);
 
 http.route({
   path: "/agentmail/webhook",

@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
-import { saveGuest } from "@/lib/open-address/folio-user";
 import { FolioMark } from "@/components/marks";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
+/**
+ * Login:
+ * - Public Convex/Vercel hosts → Convex Auth Password (product identity).
+ * - Other hosts → Better Auth email/password (+ OAuth when enabled).
+ * Guest email-as-userId is no longer offered for opening/mutating files;
+ * watch links remain unauthenticated read-only.
+ */
 export function Login() {
   const navigate = useNavigate();
+  const { signIn: convexSignIn } = useAuthActions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -17,24 +25,41 @@ export function Login() {
   useEffect(() => {
     setHost(window.location.hostname);
   }, []);
-  async function continueGuest() {
+
+  const onPublic =
+    host.endsWith("vercel.app") || host.endsWith("convex.site");
+  /** Convex-hosted product path uses Convex Auth as identity source of truth. */
+  const useConvexPassword = onPublic;
+
+  async function submitConvex(mode: "signIn" | "signUp") {
     setBusy(true);
     setErr(null);
     try {
-      if (!email.includes("@")) throw new Error("Enter the email you actually use");
-      saveGuest({ email, name: name || email.split("@")[0] });
+      if (!email.includes("@")) throw new Error("Enter a valid email");
+      if (password.length < 8) {
+        throw new Error("Password must be at least 8 characters");
+      }
+      const params: Record<string, string> = {
+        email: email.trim().toLowerCase(),
+        password,
+        flow: mode,
+      };
+      if (mode === "signUp") {
+        params.name = name.trim() || email.split("@")[0] || "You";
+      }
+      const result = await convexSignIn("password", params);
+      if (!result.signingIn) {
+        throw new Error("Could not complete sign-in. Check email and password.");
+      }
       await navigate({ to: "/files" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not continue");
+      setErr(e instanceof Error ? e.message : "Sign-in failed");
     } finally {
       setBusy(false);
     }
   }
 
-  const onPublic =
-    host.endsWith("vercel.app") || host.endsWith("convex.site");
-
-  async function submit(mode: "in" | "up") {
+  async function submitBetterAuth(mode: "in" | "up") {
     setBusy(true);
     setErr(null);
     try {
@@ -74,8 +99,8 @@ export function Login() {
           className="folio-card mt-8 space-y-4 p-5"
           onSubmit={(e) => {
             e.preventDefault();
-            if (onPublic) void continueGuest();
-            else void submit("in");
+            if (useConvexPassword) void submitConvex("signIn");
+            else void submitBetterAuth("in");
           }}
         >
           <label className="block space-y-1">
@@ -91,21 +116,20 @@ export function Login() {
               required
             />
           </label>
-          {!onPublic ? (
-            <label className="block space-y-1">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
-                Password
-              </span>
-              <input
-                className="folio-input"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </label>
-          ) : null}
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
+              Password
+            </span>
+            <input
+              className="folio-input"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </label>
           <label className="block space-y-1">
             <span className="text-[10px] uppercase tracking-[0.16em] text-muted">
               Name
@@ -115,47 +139,48 @@ export function Login() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="name"
+              placeholder="For new accounts"
             />
           </label>
           {err ? <p className="text-sm text-stamp">{err}</p> : null}
           <button type="submit" disabled={busy} className="folio-btn">
-            {busy ? "Opening…" : onPublic ? "Open my files" : "Sign in"}
+            {busy ? "Opening…" : "Sign in"}
           </button>
-          {!onPublic ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void submit("up")}
-              className="folio-btn-ghost w-full"
-            >
-              Create account
-            </button>
-          ) : null}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void (useConvexPassword
+                ? submitConvex("signUp")
+                : submitBetterAuth("up"))
+            }
+            className="folio-btn-ghost w-full"
+          >
+            Create account
+          </button>
         </form>
         <div className="mt-4 space-y-2">
-          {authEnabled && !onPublic && host
-            ? GROK_PROVIDERS.map((p) => (
-                <button
-                  key={p.providerId}
-                  type="button"
-                  onClick={() => signIn(p.providerId, { callbackURL: "/" })}
-                  className="folio-btn-ghost w-full"
-                >
-                  Continue with {p.label}
-                </button>
-              ))
-            : onPublic
-              ? (
-                <p className="text-sm text-muted">
-                  Use the email you’ll put on the letter. No password on this
-                  link.
-                </p>
-                )
-              : !authEnabled
-                ? (
-                  <p className="text-sm text-muted">Sign-in is disabled.</p>
-                  )
-                : null}
+          {useConvexPassword ? (
+            <p className="text-sm text-muted">
+              Sign in required to open or change files. Share links (
+              <span className="font-medium text-ink">/watch/…</span>) stay
+              read-only without an account. Guest email-as-identity is retired
+              on this host.
+            </p>
+          ) : authEnabled && host ? (
+            GROK_PROVIDERS.map((p) => (
+              <button
+                key={p.providerId}
+                type="button"
+                onClick={() => signIn(p.providerId, { callbackURL: "/" })}
+                className="folio-btn-ghost w-full"
+              >
+                Continue with {p.label}
+              </button>
+            ))
+          ) : !authEnabled ? (
+            <p className="text-sm text-muted">Sign-in is disabled.</p>
+          ) : null}
         </div>
         <p className="mt-10 text-xs leading-relaxed text-muted">
           Not a lawyer. Does not file in court.
