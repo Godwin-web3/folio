@@ -16,9 +16,9 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const secret = process.env.AGENTMAIL_WEBHOOK_SECRET;
-    // Fail closed when secret is configured; when unset, still accept (dev) but
-    // never expose write paths without inbox routing.
-    if (secret && request.headers.get("x-agentmail-secret") !== secret) {
+    // Fail closed: AgentMail must send header x-agentmail-secret matching
+    // AGENTMAIL_WEBHOOK_SECRET. Unset secret or mismatch → 401.
+    if (!secret || request.headers.get("x-agentmail-secret") !== secret) {
       return new Response("unauthorized", { status: 401 });
     }
     const raw = await request.json();
