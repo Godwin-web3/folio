@@ -8,11 +8,10 @@ export const Route = createFileRoute("/api/mail/webhook")({
     handlers: {
       POST: async ({ request }) => {
         const secret = process.env.AGENTMAIL_WEBHOOK_SECRET;
-        if (secret) {
-          const got = request.headers.get("x-agentmail-secret");
-          if (got !== secret) {
-            return new Response("unauthorized", { status: 401 });
-          }
+        // Fail closed: AgentMail must send header x-agentmail-secret matching
+        // AGENTMAIL_WEBHOOK_SECRET. Unset secret or mismatch → 401.
+        if (!secret || request.headers.get("x-agentmail-secret") !== secret) {
+          return new Response("unauthorized", { status: 401 });
         }
         let raw: unknown;
         try {
