@@ -55,6 +55,10 @@ export type CurrentUserState = {
  * call keeps a stable hook order across every render of a given component.
  */
 export function useCurrentUserState(): CurrentUserState {
+  // Convex static SPA uses Convex Auth only — no Better Auth /api/auth.
+  if (import.meta.env.VITE_FOLIO_SPA === "1") {
+    return { user: null, isPending: false };
+  }
   if (!authEnabled) return { user: DEV_USER, isPending: false };
   // eslint-disable-next-line react-hooks/rules-of-hooks -- authEnabled is constant for the app's lifetime
   const { data, isPending } = authClient.useSession();
