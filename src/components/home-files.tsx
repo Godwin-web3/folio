@@ -5,7 +5,10 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { api, mapFile } from "@/lib/open-address/convex-client";
-import { openFile } from "@/lib/open-address/data";
+import {
+  folioActionError,
+  prepareOpenFileInput,
+} from "@/lib/open-address/action-error";
 import { useFolioSession } from "@/lib/open-address/use-folio-session";
 import {
   addressLabel,
@@ -44,6 +47,8 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
   const rawCards = searchQuery ? searchedCards : allCards;
 
   const openDemo = useAction(api.demo.openCase);
+  // Authenticated client (same as demo). data.ts HTTP client has no auth token.
+  const openFileAction = useAction(api.open.openFile);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openForm, setOpenForm] = useState(false);
@@ -107,7 +112,7 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That did not save");
+      setError(folioActionError(err, "Could not open that file. Try again."));
     } finally {
       setBusy(null);
     }
@@ -133,7 +138,10 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
         </p>
 
         {error ? (
-          <p className="folio-card mt-4 px-4 py-3 text-sm text-stamp">
+          <p
+            role="alert"
+            className="folio-card mt-4 px-4 py-3 text-sm text-stamp"
+          >
             {error}
           </p>
         ) : null}
@@ -272,19 +280,21 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
             onSubmit={(e) => {
               e.preventDefault();
               void run("create", async () => {
-                const f = await openFile(userId, {
+                const data = prepareOpenFileInput({
                   street,
                   unit,
-                  city: "Chicago",
-                  state: "IL",
                   zip,
                   tenantName,
                   ownerName,
                   ownerEmail,
                 });
+                const fileId = await openFileAction({
+                  userId,
+                  ...data,
+                });
                 await navigate({
                   to: "/file/$fileId",
-                  params: { fileId: f.id },
+                  params: { fileId },
                   search: { step: "notice" },
                 });
               });
@@ -340,6 +350,11 @@ function HomeShell({ userId, name }: { userId: string; name: string }) {
                 onChange={(e) => setOwnerEmail(e.target.value)}
               />
             </Field>
+            {error ? (
+              <p role="alert" className="text-sm text-stamp">
+                {error}
+              </p>
+            ) : null}
             <button
               type="submit"
               disabled={busy !== null}

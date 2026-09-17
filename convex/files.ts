@@ -238,12 +238,19 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await resolveUserId(ctx, args.userId);
-    const inbox = args.caseInbox || caseInbox(args.street, args.unit);
+    const street = args.street.trim();
+    if (street.length < 3) {
+      throw new Error(
+        "Street needs a number and name, like 1757 W Berteau Ave.",
+      );
+    }
+    const unit = args.unit.trim();
+    const inbox = args.caseInbox || caseInbox(street, unit);
     const j = getJurisdiction(DEFAULT_JURISDICTION_ID);
     const fileId = await ctx.db.insert("addressFiles", {
       userId,
-      street: args.street.trim(),
-      unit: args.unit.trim(),
+      street,
+      unit,
       city: args.city.trim() || "Chicago",
       state: args.state.trim() || "IL",
       zip: args.zip.trim(),
@@ -290,7 +297,7 @@ export const create = mutation({
       fileId,
       userId,
       kind: "opened",
-      title: `File opened for ${args.street}`,
+      title: `File opened for ${street}`,
       detail: `Inbox ${inbox}`,
     });
     return fileId;
