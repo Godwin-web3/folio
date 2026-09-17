@@ -28,6 +28,11 @@ export async function getFile(
   return mapBundle(raw);
 }
 
+/**
+ * Server / script helper. The signed-in SPA must call `api.open.openFile`
+ * through the authenticated Convex React client (`useAction` / `useConvex`).
+ * This HTTP client has no Convex Auth token; `files.create` then fails closed.
+ */
 export async function openFile(
   userId: string,
   data: {
